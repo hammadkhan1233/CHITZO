@@ -45,5 +45,8 @@ def handle_disconnect():
             waiting_users.remove(sid)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Render assigns port
-    socketio.run(app, host="0.0.0.0", port=port)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    # Use eventlet for async server
+    socketio.run(app, host="0.0.0.0", port=port, debug=False, 
+                 use_reloader=False, server_options={"async_mode": "eventlet"})

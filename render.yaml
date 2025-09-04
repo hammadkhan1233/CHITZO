@@ -1,0 +1,4 @@
+build:
+  installCommand: pip install -r requirements.txt
+start:
+  command: python3 app.py

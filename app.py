@@ -5,7 +5,7 @@ import os
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# Use eventlet async server
+# Use eventlet for async WebSocket support
 socketio = SocketIO(app, async_mode="eventlet")
 
 waiting_users = []
@@ -47,5 +47,5 @@ def handle_disconnect():
             waiting_users.remove(sid)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Render assigns port
+    port = int(os.environ.get("PORT", 5000))  # Render assigns the port
     socketio.run(app, host="0.0.0.0", port=port)

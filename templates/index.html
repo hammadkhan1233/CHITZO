@@ -1,14 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Omegle Clone</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="/static/chat.js"></script>
+    <title>Omegle Clone Test</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #messages { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
+        input { padding: 8px; width: 70%; }
+        button { padding: 8px; }
+    </style>
 </head>
 <body>
-    <h2>Chat with a Stranger</h2>
-    <div id="chat-box" style="height:300px; overflow:auto; border:1px solid #ccc;"></div>
-    <input type="text" id="message" placeholder="Type your message..." />
+    <h2>Omegle Clone Chat</h2>
+    <div id="messages"></div>
+    <input id="msg" placeholder="Type a message...">
     <button onclick="sendMessage()">Send</button>
+
+    <script>
+        const socket = io();
+
+        socket.on('paired', (data) => {
+            addMessage("✅ Paired with a stranger in " + data.room);
+        });
+
+        socket.on('message', (msg) => {
+            addMessage("Stranger: " + msg);
+        });
+
+        function sendMessage() {
+            const msgInput = document.getElementById("msg");
+            const msg = msgInput.value.trim();
+            if(msg){
+                socket.emit("message", {msg: msg});
+                addMessage("You: " + msg);
+                msgInput.value = "";
+            }
+        }
+
+        function addMessage(text){
+            const div = document.getElementById("messages");
+            div.innerHTML += `<p>${text}</p>`;
+            div.scrollTop = div.scrollHeight;
+        }
+    </script>
 </body>
 </html>

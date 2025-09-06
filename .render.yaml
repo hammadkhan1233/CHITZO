@@ -3,4 +3,4 @@ services:
     name: omegle-clone
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m gunicorn -k eventlet -w 1 app:app
+    startCommand: gunicorn app:app

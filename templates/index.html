@@ -1,47 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Omegle Clone Test</title>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        #messages { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
-        input { padding: 8px; width: 70%; }
-        button { padding: 8px; }
-    </style>
+  <title>Omegle Clone</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
-    <h2>Omegle Clone Chat</h2>
-    <div id="messages"></div>
-    <input id="msg" placeholder="Type a message...">
-    <button onclick="sendMessage()">Send</button>
+  <h1>Random Stranger Chat</h1>
+  <div id="status">Connecting...</div>
 
-    <script>
-        const socket = io();
+  <ul id="chat"></ul>
 
-        socket.on('paired', (data) => {
-            addMessage("✅ Paired with a stranger in " + data.room);
-        });
+  <input id="msg" placeholder="Type a message..." />
+  <button onclick="sendMsg()">Send</button>
 
-        socket.on('message', (msg) => {
-            addMessage("Stranger: " + msg);
-        });
+  <script>
+    var socket = io();
+    var paired = false;
 
-        function sendMessage() {
-            const msgInput = document.getElementById("msg");
-            const msg = msgInput.value.trim();
-            if(msg){
-                socket.emit("message", {msg: msg});
-                addMessage("You: " + msg);
-                msgInput.value = "";
-            }
-        }
+    socket.on("paired", function(data) {
+      document.getElementById("status").innerText = "Paired with a stranger!";
+      paired = true;
+    });
 
-        function addMessage(text){
-            const div = document.getElementById("messages");
-            div.innerHTML += `<p>${text}</p>`;
-            div.scrollTop = div.scrollHeight;
-        }
-    </script>
+    socket.on("message", function(msg) {
+      let li = document.createElement("li");
+      li.innerText = msg;
+      document.getElementById("chat").appendChild(li);
+    });
+
+    function sendMsg() {
+      if (paired) {
+        let msg = document.getElementById("msg").value;
+        socket.emit("message", {msg: msg});
+        document.getElementById("msg").value = "";
+      } else {
+        alert("Not paired yet!");
+      }
+    }
+  </script>
 </body>
 </html>

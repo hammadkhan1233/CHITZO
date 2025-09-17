@@ -1,20 +1,21 @@
-const socket = io();
-let room = null;
+// server.js - Add proper CORS configuration
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
 
-socket.on('paired', (data) => {
-    room = data.room;
-    document.getElementById('chat-box').innerHTML += `<p>Connected to a stranger!</p>`;
+const app = express();
+const server = http.createServer(app);
+
+// Enable CORS
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  credentials: true
+}));
+
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
 });
-
-socket.on('message', (msg) => {
-    const chatBox = document.getElementById('chat-box');
-    chatBox.innerHTML += `<p>${msg}</p>`;
-    chatBox.scrollTop = chatBox.scrollHeight;
-});
-
-function sendMessage() {
-    const input = document.getElementById('message');
-    const msg = input.value;
-    socket.emit('message', { msg });
-    input.value = '';
-}

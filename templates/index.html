@@ -1,42 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Omegle Clone</title>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
 </head>
 <body>
-  <h1>Random Stranger Chat</h1>
-  <div id="status">Connecting...</div>
-
-  <ul id="chat"></ul>
-
-  <input id="msg" placeholder="Type a message..." />
-  <button onclick="sendMsg()">Send</button>
-
-  <script>
-    var socket = io();
-    var paired = false;
-
-    socket.on("paired", function(data) {
-      document.getElementById("status").innerText = "Paired with a stranger!";
-      paired = true;
-    });
-
-    socket.on("message", function(msg) {
-      let li = document.createElement("li");
-      li.innerText = msg;
-      document.getElementById("chat").appendChild(li);
-    });
-
-    function sendMsg() {
-      if (paired) {
-        let msg = document.getElementById("msg").value;
-        socket.emit("message", {msg: msg});
-        document.getElementById("msg").value = "";
-      } else {
-        alert("Not paired yet!");
-      }
-    }
-  </script>
+  <h1>Welcome to Omegle Clone</h1>
+  <div id="chat-box"></div>
 </body>
 </html>
+

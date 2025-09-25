@@ -1,15 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Omegle Clone</title>
- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omegle Clone</title>
 </head>
 <body>
-  <h1>Welcome to Omegle Clone</h1>
-  <div id="chat-box"></div>
-<input type="text" id="message-input" placeholder="Type a message...">
-<button onclick="sendMessage()">Send</button>
+    <h1>Welcome to Omegle Clone</h1>
+    <p>Chat system ready! Start coding your chat logic here</p>
+
+    <div id="chat-box" style="border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px;"></div>
+    <input type="text" id="message-input" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <script>
+        // Connect to the server
+        const socket = io();
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        
+        // Listen for 'match_found' event from the server
+        socket.on('match_found', function(data) {
+            chatBox.innerHTML += `<p><strong>${data.message}</strong></p>`;
+        });
+        
+        // Listen for 'new_message' event from the server
+        socket.on('new_message', function(data) {
+            chatBox.innerHTML += `<p>Stranger: ${data.message}</p>`;
+        });
+        
+        // Function to send a message
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message.trim() !== '') {
+                // Emit the 'message' event to the server
+                socket.emit('message', { message: message });
+                messageInput.value = ''; // Clear the input field
+            }
+        }
+    </script>
 </body>
 </html>
-

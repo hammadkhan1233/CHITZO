@@ -31,12 +31,19 @@
             font-weight: bold;
             color: #007bff;
         }
+        ul#messages {
+            list-style: none;
+            padding: 0;
+        }
+        ul#messages li {
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
     <h1>Welcome to Omegle Clone</h1>
     <div id="status">Waiting for a match...</div>
-    <div id="chat-box"></div>
+    <ul id="messages"></ul>
     <input type="text" id="message-input" placeholder="Type a message...">
     <button id="send-button">Send</button>
 

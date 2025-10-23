@@ -1,26 +1,51 @@
+const socket = io();
+
+// DOM elements
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
+const messagesList = document.getElementById('messages');
+const statusBox = document.getElementById('status');
 
-// Function to handle the actual sending (same one used by the Send button)
+// Send message to server
 function sendMessage() {
-    const message = messageInput.value;
-    if (message.trim() !== '') {
-        // 1. Send to server/stranger
-        // Your_Send_Logic(storedUserName, message);
-
-        // 2. Clear input
+    const message = messageInput.value.trim();
+    if (message !== '') {
+        socket.emit('message', { message: message });
         messageInput.value = '';
     }
 }
 
-// Event listener for the input field
+// Listen for Enter key
 messageInput.addEventListener('keydown', function(event) {
-    // Check if the pressed key is Enter (keyCode 13)
     if (event.key === 'Enter') {
-        event.preventDefault(); // Stop the default Enter action (like form submission)
-        sendMessage(); // Trigger the message send logic
+        event.preventDefault();
+        sendMessage();
     }
 });
 
-// Optionally, still link the button to the function
+// Listen for Send button
 sendButton.addEventListener('click', sendMessage);
+
+// --- Socket.IO Events ---
+
+// When matched with a stranger
+socket.on('match_found', (data) => {
+    statusBox.textContent = data.message;
+    messagesList.innerHTML = ''; // Clear old messages
+});
+
+// When a new message is received
+socket.on('new_message', (data) => {
+    const item = document.createElement('li');
+    item.textContent = data.message;
+    messagesList.appendChild(item);
+});
+
+// When the other user disconnects
+socket.on('user_disconnected', (data) => {
+    const item = document.createElement('li');
+    item.textContent = data.message;
+    item.style.color = 'red';
+    messagesList.appendChild(item);
+    statusBox.textContent = 'Stranger disconnected. Refresh to find a new match.';
+});

@@ -5,47 +5,157 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Omegle Clone</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 40px;
+        /* --- Basic Reset & Body --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* --- Chat Container --- */
+        .chat-container {
+            width: 100%;
+            max-width: 650px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Keeps rounded corners */
+            display: flex;
+            flex-direction: column;
+            height: 90vh; /* Make the container tall */
+            max-height: 700px;
+        }
+
+        /* --- Header --- */
+        h1 {
+            background-color: #007bff;
+            color: white;
+            padding: 16px 20px;
+            font-size: 1.25rem;
+            text-align: center;
+            margin: 0;
+        }
+
+        /* --- Status Bar --- */
+        #status {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #555;
+            background-color: #fcfcfc;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+
+        /* --- Message List (The Chat Box) --- */
+        /* This div now correctly wraps your message list */
         #chat-box {
-            border: 1px solid #ccc;
-            height: 300px;
-            width: 80%;
-            margin: 0 auto 20px;
+            flex-grow: 1; /* Makes the chat box fill available space */
             overflow-y: scroll;
-            padding: 10px;
+            padding: 20px;
             background-color: #f9f9f9;
         }
-        #message-input {
-            width: 60%;
-            padding: 10px;
-        }
-        #send-button {
-            padding: 10px 20px;
-        }
-        #status {
-            margin-bottom: 10px;
-            font-weight: bold;
-            color: #007bff;
-        }
+
         ul#messages {
             list-style: none;
             padding: 0;
+            display: flex;
+            flex-direction: column;
         }
+
+        /* --- Message Bubbles --- */
         ul#messages li {
-            margin: 5px 0;
+            padding: 10px 15px;
+            border-radius: 18px;
+            background-color: #e9e9eb; /* Neutral gray for bubbles */
+            color: #333;
+            max-width: 80%;
+            word-wrap: break-word;
+            align-self: flex-start; /* All messages default to left */
+            text-align: left;
+            margin-bottom: 10px;
+            line-height: 1.4;
         }
+        
+        /* NOTE: For a true Omegle clone, you'd have your JS add a class
+           like "my-message" to your own messages. The CSS would be:
+           ul#messages li.my-message {
+                background-color: #007bff;
+                color: white;
+                align-self: flex-end; 
+           }
+        */
+
+
+        /* --- Input Area --- */
+        .input-area {
+            display: flex;
+            padding: 15px;
+            background-color: #ffffff;
+            border-top: 1px solid #ddd;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #ccc;
+            border-radius: 24px; /* Pill shape */
+            margin-right: 10px;
+            font-size: 1rem;
+        }
+        
+        #message-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        #send-button {
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 24px; /* Pill shape */
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+        }
+
+        #send-button:hover {
+            background-color: #0056b3;
+        }
+
     </style>
 </head>
 <body>
-    <h1>Welcome to Omegle Clone</h1>
-    <div id="status">Waiting for a match...</div>
-    <ul id="messages"></ul>
-    <input type="text" id="message-input" placeholder="Type a message...">
-    <button id="send-button">Send</button>
+
+    <div class="chat-container">
+        
+        <h1>Welcome to Omegle Clone</h1>
+        
+        <div id="status">Waiting for a match...</div>
+
+        <div id="chat-box">
+            <ul id="messages"></ul>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <button id="send-button">Send</button>
+        </div>
+
+    </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="/static/chat.js"></script>

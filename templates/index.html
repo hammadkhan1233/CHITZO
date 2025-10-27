@@ -7,34 +7,71 @@
     <style>
         /* ... (all your existing CSS from the previous step) ... */
 
-        /* --- NEW: Video Container Styles --- */
-        #video-container {
+        /* --- Input Area --- */
+        .input-area {
             display: flex;
-            justify-content: space-between;
-            background-color: #000;
-            padding: 5px;
-            position: relative; /* For stacking videos */
-            min-height: 200px; /* Give it some height */
+            padding: 15px;
+            background-color: #ffffff;
+            border-top: 1px solid #ddd;
+            align-items: center; /* Vertically align items */
         }
 
-        #remote-video {
-            width: 100%;
-            height: auto;
-            background-color: #222;
-        }
-
-        #local-video {
-            width: 30%; /* Smaller local video */
-            max-width: 180px;
-            height: auto;
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            border: 2px solid white;
-            border-radius: 5px;
+        #message-input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #ccc;
+            border-radius: 24px; /* Pill shape */
+            margin-right: 10px;
+            font-size: 1rem;
         }
         
-        /* --- Style for audio players in chat --- */
+        #message-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        /* --- Style for Send and Record Buttons --- */
+        .chat-button {
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 24px; /* Pill shape */
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+            margin-left: 5px; /* Spacing between buttons */
+        }
+
+        .chat-button:hover {
+            background-color: #0056b3;
+        }
+        
+        /* --- NEW: Style for Record Button --- */
+        #record-button {
+            padding: 12px 15px; /* Make it a bit more square */
+            font-size: 1.2rem; /* Make icon bigger */
+            background-color: #28a745; /* Green */
+        }
+        
+        #record-button:hover {
+            background-color: #218838;
+        }
+        
+        #record-button.is-recording {
+            background-color: #dc3545; /* Red when recording */
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+
+        /* --- NEW: Style for audio players in chat --- */
         ul#messages li audio {
             display: block;
             margin-top: 5px;
@@ -51,23 +88,17 @@
     <div class="chat-container" id="chat-container">
         
         <h1>Chat Hub</h1>
-        
-        <div id="video-container">
-            <video id="remote-video" autoplay playsinline></video>
-            <video id="local-video" autoplay muted playsinline></video>
-        </div>
-        
         <div id="status">Waiting for a match...</div>
-
         <div id="chat-box">
             <ul id="messages"></ul>
         </div>
-        
         <div id="typing-status"></div>
 
         <div class="input-area">
             <input type="text" id="message-input" placeholder="Type a message...">
+            
             <button id="record-button" class="chat-button" title="Record Voice Message">🎤</button>
+            
             <button id="send-button" class="chat-button">Send</button>
         </div>
 

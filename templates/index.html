@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omegle Clone</title>
+    <title>Chat Hub</title>
     <style>
         /* --- Basic Reset & Body --- */
         * {
@@ -22,6 +22,66 @@
             padding: 20px;
         }
 
+        /* --- Lobby Screen --- */
+        #lobby {
+            width: 100%;
+            max-width: 450px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+        }
+
+        #lobby h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        #lobby p {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+        }
+
+        #lobby .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        #lobby label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #444;
+        }
+
+        #lobby input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        #lobby button {
+            width: 100%;
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+            margin-top: 10px;
+        }
+
+        #lobby button:hover {
+            background-color: #0056b3;
+        }
+
         /* --- Chat Container --- */
         .chat-container {
             width: 100%;
@@ -30,14 +90,14 @@
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             overflow: hidden; /* Keeps rounded corners */
-            display: flex;
+            display: none; /* Hidden by default */
             flex-direction: column;
             height: 90vh; /* Make the container tall */
             max-height: 700px;
         }
 
         /* --- Header --- */
-        h1 {
+        .chat-container h1 {
             background-color: #007bff;
             color: white;
             padding: 16px 20px;
@@ -58,7 +118,6 @@
         }
 
         /* --- Message List (The Chat Box) --- */
-        /* This div now correctly wraps your message list */
         #chat-box {
             flex-grow: 1; /* Makes the chat box fill available space */
             overflow-y: scroll;
@@ -77,24 +136,31 @@
         ul#messages li {
             padding: 10px 15px;
             border-radius: 18px;
-            background-color: #e9e9eb; /* Neutral gray for bubbles */
+            background-color: #e9e9eb; /* Neutral gray for STRANGER */
             color: #333;
             max-width: 80%;
             word-wrap: break-word;
-            align-self: flex-start; /* All messages default to left */
+            align-self: flex-start; /* Stranger messages on left */
             text-align: left;
             margin-bottom: 10px;
             line-height: 1.4;
         }
         
-        /* NOTE: For a true Omegle clone, you'd have your JS add a class
-           like "my-message" to your own messages. The CSS would be:
-           ul#messages li.my-message {
-                background-color: #007bff;
-                color: white;
-                align-self: flex-end; 
-           }
-        */
+        /* --- ADDED FOR YOUR MESSAGES --- */
+        ul#messages li.my-message {
+            background-color: #007bff; /* Blue for USER */
+            color: white;
+            align-self: flex-end; /* User messages on right */
+        }
+
+
+        /* --- Typing Status --- */
+        #typing-status {
+            font-style: italic;
+            color: #777;
+            padding: 0px 20px 10px;
+            height: 1.2em; /* Reserve space to prevent layout jump */
+        }
 
 
         /* --- Input Area --- */
@@ -140,15 +206,35 @@
 </head>
 <body>
 
-    <div class="chat-container">
+    <div id="lobby">
+        <h1>Welcome to Chat Hub</h1>
+        <p>Please enter your information to start chatting. You must be 18 or older to use this service.</p>
         
-        <h1>Welcome to Omegle Clone</h1>
+        <div class="form-group">
+            <label for="name-input">Your Name:</label>
+            <input type="text" id="name-input" placeholder="Enter your name">
+        </div>
+        
+        <div class="form-group">
+            <label for="age-input">Your Age:</label>
+            <input type="number" id="age-input" placeholder="Enter your age">
+        </div>
+
+        <button id="start-chat-button">Start Chat</button>
+    </div>
+
+
+    <div class="chat-container" id="chat-container">
+        
+        <h1>Chat Hub</h1>
         
         <div id="status">Waiting for a match...</div>
 
         <div id="chat-box">
             <ul id="messages"></ul>
         </div>
+        
+        <div id="typing-status"></div>
 
         <div class="input-area">
             <input type="text" id="message-input" placeholder="Type a message...">

@@ -48,8 +48,14 @@ def handle_join_queue(data):
         user_to_room[user2_sid] = room_id
 
         # Notify each user about the *other* user
-        emit('match_found', {'message': f'You have been matched with {user2_name}!'}, room=user1_sid)
-        emit('match_found', {'message': f'You have been matched with {user1_name}!'}, room=user2_sid)
+        # --- MODIFIED: Assign one user as the "caller" ---
+        emit('match_found', 
+             {'message': f'You have been matched with {user2_name}!', 'is_caller': True}, 
+             room=user1_sid)
+        emit('match_found', 
+             {'message': f'You have been matched with {user1_name}!', 'is_caller': False}, 
+             room=user2_sid)
+        
         print(f"Matched {user1_sid} and {user2_sid} in room {room_id}")
 
 @socketio.on('message')
@@ -59,8 +65,18 @@ def handle_message(data):
     message = data.get('message')
 
     if room_id and message:
-        # Emit to the room, but skip the sender (who already added it to their UI)
         emit('new_message', {'message': message, 'name': user_name}, room=room_id, skip_sid=request.sid)
+
+@socketio.on('voice_message')
+def handle_voice_message(audio_data):
+    room_id = user_to_room.get(request.sid)
+    user_name = sid_to_name.get(request.sid, 'Stranger')
+
+    if room_id and audio_data:
+        emit('new_voice_message', 
+             {'audio': audio_data, 'name': user_name}, 
+             room=room_id, 
+             skip_sid=request.sid)
 
 @socketio.on('typing')
 def handle_typing():
@@ -74,12 +90,33 @@ def handle_stop_typing():
     if room_id:
         emit('stranger_stopped_typing', room=room_id, skip_sid=request.sid)
 
+# --- NEW: WebRTC Signaling Handlers ---
+
+@socketio.on('webrtc_offer')
+def handle_webrtc_offer(data):
+    room_id = user_to_room.get(request.sid)
+    if room_id:
+        emit('webrtc_offer', data, room=room_id, skip_sid=request.sid)
+
+@socketio.on('webrtc_answer')
+def handle_webrtc_answer(data):
+    room_id = user_to_room.get(request.sid)
+    if room_id:
+        emit('webrtc_answer', data, room=room_id, skip_sid=request.sid)
+
+@socketio.on('webrtc_ice_candidate')
+def handle_webrtc_ice_candidate(data):
+    room_id = user_to_room.get(request.sid)
+    if room_id:
+        emit('webrtc_ice_candidate', data, room=room_id, skip_sid=request.sid)
+
+# --- End of WebRTC Handlers ---
+
 @socketio.on('disconnect')
 def handle_disconnect():
     user_sid = request.sid
     print(f"Client disconnected: {user_sid}")
 
-    # Remove from queue if they disconnect before matching
     user_queue = [u for u in user_queue if u[0] != user_sid]
 
     if user_sid in sid_to_name:
@@ -87,10 +124,8 @@ def handle_disconnect():
 
     room_id = user_to_room.get(user_sid)
     if room_id:
-        # Notify the other user in the room
         emit('user_disconnected', {'message': 'The other user has disconnected.'}, room=room_id, skip_sid=user_sid)
 
-        # Remove both users from mappings
         del user_to_room[user_sid]
         for user, room in list(user_to_room.items()):
             if room == room_id:

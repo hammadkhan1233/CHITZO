@@ -62,19 +62,6 @@ def handle_message(data):
         # Emit to the room, but skip the sender (who already added it to their UI)
         emit('new_message', {'message': message, 'name': user_name}, room=room_id, skip_sid=request.sid)
 
-# --- NEW: VOICE MESSAGE HANDLER ---
-@socketio.on('voice_message')
-def handle_voice_message(audio_data):
-    room_id = user_to_room.get(request.sid)
-    user_name = sid_to_name.get(request.sid, 'Stranger')
-
-    if room_id and audio_data:
-        # Pass the raw audio bytes (audio_data) to the other user
-        emit('new_voice_message', 
-             {'audio': audio_data, 'name': user_name}, 
-             room=room_id, 
-             skip_sid=request.sid)
-
 @socketio.on('typing')
 def handle_typing():
     room_id = user_to_room.get(request.sid)

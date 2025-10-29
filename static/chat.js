@@ -3,6 +3,7 @@ const lobby = document.getElementById('lobby');
 const startChatButton = document.getElementById('start-chat-button');
 const nameInput = document.getElementById('name-input');
 const ageInput = document.getElementById('age-input');
+const userCountDisplay = document.getElementById('user-count'); // NEW: For online count
 
 // --- CHAT ELEMENTS ---
 const chatContainer = document.getElementById('chat-container');
@@ -12,80 +13,92 @@ const messagesList = document.getElementById('messages');
 const statusBox = document.getElementById('status');
 const typingStatus = document.getElementById('typing-status');
 
-let socket;
+let socket = io(); // NEW: Connect on page load to get user count
+let currentName; // NEW: Store name globally for reconnect
 let typingTimer;
 
 // --- LOBBY LOGIC ---
 startChatButton.addEventListener('click', () => {
-    const name = nameInput.value.trim();
+    currentName = nameInput.value.trim(); // Use global variable
     const age = parseInt(ageInput.value, 10);
-
-    if (name === '') {
-        alert('Please enter your name.');
+    
+    // REQ 2: Validate name (letters and spaces only)
+    const nameRegex = /^[A-Za-z\s]+$/;
+    if (currentName === '' || !nameRegex.test(currentName)) {
+        alert('Please enter your name (letters and spaces only).');
         return;
     }
 
-    if (isNaN(age) || age < 18) {
-        alert('You must be 18 or older to chat.');
+    // REQ 3 & 4: Validate age (13+, numbers only)
+    if (isNaN(age) || age < 13) {
+        alert('You must be 13 or older to chat.');
         return;
     }
 
-    // --- POP-UP MESSAGE (REQUEST 7) ---
-    alert('Welcome to Chat Hub!\nPlease maintain discipline and do not use vulgar language. Be respectful to others.');
+    // --- REQ 1: Pop-up message removed ---
 
     // Hide lobby and show chat
     lobby.style.display = 'none';
     chatContainer.style.display = 'flex';
 
-    // NOW connect to the server
-    initializeSocket(name);
+    // NOW join the queue
+    statusBox.textContent = 'Waiting for a match...';
+    messagesList.innerHTML = ''; // Clear old messages
+    socket.emit('join_queue', { name: currentName });
 });
 
 
-// --- CHAT LOGIC ---
-function initializeSocket(name) {
-    socket = io();
+// --- GLOBAL SOCKET LOGIC (runs on page load) ---
 
-    socket.on('connect', () => {
-        console.log('Connected with ID:', socket.id);
-        // Send join request with name
-        socket.emit('join_queue', { name: name });
-    });
+socket.on('connect', () => {
+    console.log('Connected with ID:', socket.id);
+    // Client will automatically get a user count broadcast
+});
 
-    socket.on('match_found', (data) => {
-        statusBox.textContent = data.message;
-        messagesList.innerHTML = '';
-        typingStatus.textContent = '';
-    });
+// REQ 7: Listen for user count updates
+socket.on('update_user_count', (data) => {
+    userCountDisplay.textContent = data.count;
+});
 
-    socket.on('new_message', (data) => {
-        // This is a message from the STRANGER
-        const item = document.createElement('li');
-        item.textContent = `${data.name}: ${data.message}`;
-        messagesList.appendChild(item);
-        // Scroll to bottom
-        messagesList.scrollTop = messagesList.scrollHeight;
-    });
+socket.on('match_found', (data) => {
+    statusBox.textContent = data.message;
+    messagesList.innerHTML = '';
+    typingStatus.textContent = '';
+});
 
-    socket.on('user_disconnected', (data) => {
-        const item = document.createElement('li');
-        item.textContent = data.message;
-        item.style.color = 'red';
-        item.style.fontStyle = 'italic';
-        messagesList.appendChild(item);
-        statusBox.textContent = 'Stranger disconnected. Refresh to find a new match.';
-        typingStatus.textContent = '';
-    });
+socket.on('new_message', (data) => {
+    // This is a message from the STRANGER
+    const item = document.createElement('li');
+    item.textContent = `${data.name}: ${data.message}`;
+    messagesList.appendChild(item);
+    // Scroll to bottom
+    messagesList.scrollTop = messagesList.scrollHeight;
+});
 
-    // --- TYPING INDICATOR LISTENERS ---
-    socket.on('stranger_typing', () => {
-        typingStatus.textContent = 'Stranger is typing...';
-    });
+// REQ 8: Auto-reconnect on disconnect
+socket.on('user_disconnected', (data) => {
+    const item = document.createElement('li');
+    item.textContent = data.message;
+    item.style.color = 'red';
+    item.style.fontStyle = 'italic';
+    messagesList.appendChild(item);
+    
+    // NEW: Auto-reconnect logic
+    statusBox.textContent = 'Stranger disconnected. Finding a new match...';
+    typingStatus.textContent = '';
+    
+    // Re-join the queue using the stored name
+    socket.emit('join_queue', { name: currentName });
+});
 
-    socket.on('stranger_stopped_typing', () => {
-        typingStatus.textContent = '';
-    });
-}
+// --- TYPING INDICATOR LISTENERS ---
+socket.on('stranger_typing', () => {
+    typingStatus.textContent = 'Stranger is typing...';
+});
+
+socket.on('stranger_stopped_typing', () => {
+    typingStatus.textContent = '';
+});
 
 
 function sendMessage() {

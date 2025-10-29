@@ -14,6 +14,15 @@ user_to_room = {}
 # Mapping of user SID to name
 sid_to_name = {}
 
+# NEW: Set to track all connected users for online count
+connected_users = set()
+
+def broadcast_user_count():
+    """Helper function to broadcast the current user count to everyone."""
+    count = len(connected_users)
+    print(f"Broadcasting user count: {count}")
+    emit('update_user_count', {'count': count}, broadcast=True)
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -23,6 +32,9 @@ def home():
 @socketio.on('connect')
 def handle_connect():
     print(f"Client connected: {request.sid}")
+    # NEW: Add user to online set and broadcast
+    connected_users.add(request.sid)
+    broadcast_user_count()
 
 @socketio.on('join_queue')
 def handle_join_queue(data):
@@ -30,7 +42,11 @@ def handle_join_queue(data):
     user_name = data.get('name', 'Stranger')
     
     print(f"Client {user_sid} ({user_name}) joined queue")
-    user_queue.append((user_sid, user_name))
+    
+    # Add user to queue (if not already in it)
+    if not any(user_sid in u for u in user_queue):
+        user_queue.append((user_sid, user_name))
+        
     sid_to_name[user_sid] = user_name
 
     if len(user_queue) >= 2:
@@ -76,8 +92,12 @@ def handle_stop_typing():
 
 @socketio.on('disconnect')
 def handle_disconnect():
+    global user_queue # IMPORTANT FIX
     user_sid = request.sid
     print(f"Client disconnected: {user_sid}")
+
+    # NEW: Remove user from online set
+    connected_users.discard(user_sid)
 
     # Remove from queue if they disconnect before matching
     user_queue = [u for u in user_queue if u[0] != user_sid]
@@ -88,6 +108,7 @@ def handle_disconnect():
     room_id = user_to_room.get(user_sid)
     if room_id:
         # Notify the other user in the room
+        # This will trigger their client's auto-reconnect
         emit('user_disconnected', {'message': 'The other user has disconnected.'}, room=room_id, skip_sid=user_sid)
 
         # Remove both users from mappings
@@ -98,6 +119,9 @@ def handle_disconnect():
                 if user in sid_to_name:
                     del sid_to_name[user]
                 break
+    
+    # NEW: Broadcast the new lower count
+    broadcast_user_count()
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), allow_unsafe_werkzeug=True)

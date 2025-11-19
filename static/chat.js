@@ -1,149 +1,299 @@
-// --- LOBBY ELEMENTS ---
-const lobby = document.getElementById('lobby');
-const startChatButton = document.getElementById('start-chat-button');
-const nameInput = document.getElementById('name-input');
-const ageInput = document.getElementById('age-input');
-const userCountDisplay = document.getElementById('user-count'); // NEW: For online count
+// Establish Socket Connection
+const socket = io();
 
-// --- CHAT ELEMENTS ---
-const chatContainer = document.getElementById('chat-container');
-const messageInput = document.getElementById('message-input');
-const sendButton = document.getElementById('send-button');
-const messagesList = document.getElementById('messages');
-const statusBox = document.getElementById('status');
-const typingStatus = document.getElementById('typing-status');
+// State
+const STATE = {
+    connected: false,
+    mode: 'none', // 'p2p' | 'group'
+    roomId: null,
+    mediaStream: null,
+    peerConnection: null,
+    mediaRecorder: null,
+    chunks: []
+};
 
-let socket = io(); // NEW: Connect on page load to get user count
-let currentName; // NEW: Store name globally for reconnect
-let typingTimer;
+// DOM Cache
+const els = {
+    loginScreen: document.getElementById('login-screen'),
+    appInterface: document.getElementById('app-interface'),
+    loginForm: document.getElementById('login-form'),
+    msgContainer: document.getElementById('messages-container'),
+    msgInput: document.getElementById('message-input'),
+    sendBtn: document.getElementById('btn-send'),
+    recordBtn: document.getElementById('btn-record'),
+    videoOverlay: document.getElementById('video-overlay'),
+    localVideo: document.getElementById('local-video'),
+    remoteVideo: document.getElementById('remote-video'),
+    statusIndicator: document.getElementById('chat-status-indicator'),
+    chatTitle: document.getElementById('chat-title'),
+    chatSubtitle: document.getElementById('chat-subtitle'),
+    serverCap: document.getElementById('server-cap-display')
+};
 
-// --- LOBBY LOGIC ---
-startChatButton.addEventListener('click', () => {
-    currentName = nameInput.value.trim(); // Use global variable
-    const age = parseInt(ageInput.value, 10);
-    
-    // REQ 2: Validate name (letters and spaces only)
-    const nameRegex = /^[A-Za-z\s]+$/;
-    if (currentName === '' || !nameRegex.test(currentName)) {
-        alert('Please enter your name (letters and spaces only).');
-        return;
-    }
+// WebRTC Config
+const rtcConfig = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
 
-    // REQ 3 & 4: Validate age (13+, numbers only)
-    if (isNaN(age) || age < 13) {
-        alert('You must be 13 or older to chat.');
-        return;
-    }
-
-    // --- REQ 1: Pop-up message removed ---
-
-    // Hide lobby and show chat
-    lobby.style.display = 'none';
-    chatContainer.style.display = 'flex';
-
-    // NOW join the queue
-    statusBox.textContent = 'Waiting for a match...';
-    messagesList.innerHTML = ''; // Clear old messages
-    socket.emit('join_queue', { name: currentName });
-});
-
-
-// --- GLOBAL SOCKET LOGIC (runs on page load) ---
+// --- SOCKET EVENTS ---
 
 socket.on('connect', () => {
-    console.log('Connected with ID:', socket.id);
-    // Client will automatically get a user count broadcast
+    console.log('Connected to server');
 });
 
-// REQ 7: Listen for user count updates
-socket.on('update_user_count', (data) => {
-    userCountDisplay.textContent = data.count;
+socket.on('server_stats', (data) => {
+    if (els.serverCap) els.serverCap.innerText = data.count;
 });
 
-socket.on('match_found', (data) => {
-    statusBox.textContent = data.message;
-    messagesList.innerHTML = '';
-    typingStatus.textContent = '';
+socket.on('login_success', (data) => {
+    els.loginScreen.classList.add('hidden');
+    els.appInterface.classList.remove('hidden');
+    document.getElementById('user-badge').innerText = data.name;
+    showToast('Welcome', `Logged in as ${data.name}`, 'success');
 });
 
-socket.on('new_message', (data) => {
-    // This is a message from the STRANGER
-    const item = document.createElement('li');
-    item.textContent = `${data.name}: ${data.message}`;
-    messagesList.appendChild(item);
-    // Scroll to bottom
-    messagesList.scrollTop = messagesList.scrollHeight;
+socket.on('login_error', (data) => showToast('Error', data.msg, 'error'));
+
+socket.on('p2p_waiting', (data) => {
+    els.chatTitle.innerText = "Searching...";
+    els.chatSubtitle.innerText = data.msg;
+    els.statusIndicator.className = "w-3 h-3 bg-yellow-500 rounded-full animate-pulse";
+    clearChat();
 });
 
-// REQ 8: Auto-reconnect on disconnect
-socket.on('user_disconnected', (data) => {
-    const item = document.createElement('li');
-    item.textContent = data.message;
-    item.style.color = 'red';
-    item.style.fontStyle = 'italic';
-    messagesList.appendChild(item);
-    
-    // NEW: Auto-reconnect logic
-    statusBox.textContent = 'Stranger disconnected. Finding a new match...';
-    typingStatus.textContent = '';
-    
-    // Re-join the queue using the stored name
-    socket.emit('join_queue', { name: currentName });
+socket.on('p2p_matched', (data) => {
+    STATE.mode = 'p2p';
+    STATE.roomId = data.room;
+    els.chatTitle.innerText = "Connected";
+    els.chatSubtitle.innerText = `Chatting with ${data.partner}`;
+    els.statusIndicator.className = "w-3 h-3 bg-emerald-500 rounded-full";
+    enableChat();
+    addSystemMessage(`Matched with ${data.partner}. Say hi!`);
 });
 
-// --- TYPING INDICATOR LISTENERS ---
-socket.on('stranger_typing', () => {
-    typingStatus.textContent = 'Stranger is typing...';
+socket.on('group_joined', (data) => {
+    STATE.mode = 'group';
+    STATE.roomId = `group_${data.region}`;
+    els.chatTitle.innerText = `Channel: ${data.region.toUpperCase()}`;
+    els.chatSubtitle.innerText = "Public Group";
+    els.statusIndicator.className = "w-3 h-3 bg-emerald-500 rounded-full";
+    enableChat();
+    addSystemMessage(`Joined ${data.region} channel.`);
 });
 
-socket.on('stranger_stopped_typing', () => {
-    typingStatus.textContent = '';
+socket.on('peer_disconnected', () => {
+    addSystemMessage("Partner disconnected.");
+    els.msgInput.disabled = true;
+    els.sendBtn.disabled = true;
+    endCall(); // Ensure video cleanup
 });
 
+socket.on('message', (data) => {
+    const type = data.isSelf ? 'out' : 'in';
+    if (data.audio) {
+        // Convert base64 back to blob for playback (simplified)
+        addAudioMessage(data.audio, type);
+    } else {
+        addMessage(data.text, type, data.user);
+    }
+});
 
-function sendMessage() {
-    const message = messageInput.value.trim();
-    if (message !== '' && socket) {
-        console.log('Sending:', message);
-        
-        // --- ADD MY MESSAGE TO UI (REQUEST 1) ---
-        const item = document.createElement('li');
-        item.textContent = `You: ${message}`;
-        item.classList.add('my-message'); // This class right-aligns it
-        messagesList.appendChild(item);
-        
-        // Scroll to bottom
-        messagesList.scrollTop = messagesList.scrollHeight;
+// --- UI INTERACTION ---
 
-        // Send message to server
-        socket.emit('message', { message: message });
-        
-        // Stop a "typing" indicator if one was running
-        clearTimeout(typingTimer);
-        socket.emit('stop_typing');
+els.loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('username').value;
+    const age = document.getElementById('age').value;
+    socket.emit('login', { name, age });
+});
 
-        messageInput.value = '';
+document.getElementById('btn-p2p').addEventListener('click', () => {
+    setActiveMode('p2p');
+    socket.emit('join_p2p');
+});
+
+document.getElementById('btn-group').addEventListener('click', () => {
+    setActiveMode('group');
+    document.getElementById('region-selector').classList.remove('hidden');
+});
+
+document.getElementById('region-select').addEventListener('change', (e) => {
+    if (STATE.mode === 'group') {
+        socket.emit('join_group', { region: e.target.value });
+    }
+});
+
+// Start group chat when first entering group mode
+function setActiveMode(mode) {
+    STATE.mode = mode;
+    // UI Toggles (simplified for brevity)
+    if(mode === 'group') {
+        document.getElementById('region-selector').classList.remove('hidden');
+        socket.emit('join_group', { region: document.getElementById('region-select').value });
+    } else {
+        document.getElementById('region-selector').classList.add('hidden');
     }
 }
 
-messageInput.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        sendMessage();
-    }
+// --- MESSAGING ---
+
+els.sendBtn.addEventListener('click', sendMessage);
+els.msgInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
 });
 
-// --- TYPING INDICATOR EMITTERS ---
-messageInput.addEventListener('input', () => {
-    if (socket) {
-        socket.emit('typing');
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => {
-            if (socket) {
-                socket.emit('stop_typing');
+function sendMessage() {
+    const text = els.msgInput.value.trim();
+    if (!text) return;
+    socket.emit('send_message', { text: text });
+    els.msgInput.value = '';
+}
+
+function addMessage(text, type, user) {
+    const div = document.createElement('div');
+    div.className = `max-w-[80%] p-3 mb-2 ${type === 'out' ? 'message-out' : 'message-in'} fade-in`;
+    
+    if (type === 'in') {
+        const nameTag = document.createElement('div');
+        nameTag.className = "text-[10px] font-bold opacity-75 mb-1";
+        nameTag.innerText = user;
+        div.appendChild(nameTag);
+    }
+    
+    const content = document.createElement('div');
+    content.innerText = text;
+    div.appendChild(content);
+    
+    els.msgContainer.appendChild(div);
+    scrollToBottom();
+}
+
+function addSystemMessage(text) {
+    const div = document.createElement('div');
+    div.className = "text-center text-xs text-slate-500 my-4";
+    div.innerText = text;
+    els.msgContainer.appendChild(div);
+    scrollToBottom();
+}
+
+function clearChat() {
+    els.msgContainer.innerHTML = '';
+}
+
+function enableChat() {
+    els.msgInput.disabled = false;
+    els.sendBtn.disabled = false;
+    document.getElementById('welcome-placeholder').classList.add('hidden');
+}
+
+function scrollToBottom() {
+    els.msgContainer.scrollTop = els.msgContainer.scrollHeight;
+}
+
+// --- VIDEO CALLING (WebRTC) ---
+
+document.getElementById('btn-video').addEventListener('click', startVideoCall);
+document.getElementById('btn-vc').addEventListener('click', startVideoCall); // Reuse logic for now
+
+async function startVideoCall() {
+    if (!STATE.roomId) return showToast('Error', 'Join a room first', 'error');
+    
+    try {
+        STATE.mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        els.localVideo.srcObject = STATE.mediaStream;
+        els.videoOverlay.classList.remove('hidden');
+        document.getElementById('active-call-panel').classList.remove('hidden');
+
+        STATE.peerConnection = new RTCPeerConnection(rtcConfig);
+        
+        // Add tracks
+        STATE.mediaStream.getTracks().forEach(track => {
+            STATE.peerConnection.addTrack(track, STATE.mediaStream);
+        });
+
+        // Handle remote stream
+        STATE.peerConnection.ontrack = (event) => {
+            els.remoteVideo.srcObject = event.streams[0];
+        };
+
+        // ICE Candidates
+        STATE.peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('signal', { type: 'candidate', data: event.candidate });
             }
-        }, 2000); // 2-second timeout
+        };
+
+        // Create Offer
+        const offer = await STATE.peerConnection.createOffer();
+        await STATE.peerConnection.setLocalDescription(offer);
+        socket.emit('signal', { type: 'offer', data: offer });
+
+    } catch (err) {
+        showToast('Error', 'Could not access camera/mic', 'error');
+        console.error(err);
+    }
+}
+
+// Handle Signaling
+socket.on('signal', async (msg) => {
+    if (!STATE.peerConnection) {
+        // Receiver setup
+        STATE.peerConnection = new RTCPeerConnection(rtcConfig);
+        
+        // If we receive an offer, we might need to get our own media to answer
+        if (msg.type === 'offer' && !STATE.mediaStream) {
+             // For simplicity in this demo, answer with audio/video if possible
+             try {
+                 STATE.mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                 els.localVideo.srcObject = STATE.mediaStream;
+                 STATE.mediaStream.getTracks().forEach(track => STATE.peerConnection.addTrack(track, STATE.mediaStream));
+                 els.videoOverlay.classList.remove('hidden');
+                 document.getElementById('active-call-panel').classList.remove('hidden');
+                 
+                 STATE.peerConnection.ontrack = (e) => els.remoteVideo.srcObject = e.streams[0];
+                 STATE.peerConnection.onicecandidate = (e) => {
+                     if (e.candidate) socket.emit('signal', { type: 'candidate', data: e.candidate });
+                 };
+             } catch (e) { console.error(e); }
+        }
+    }
+
+    if (msg.type === 'offer') {
+        await STATE.peerConnection.setRemoteDescription(new RTCSessionDescription(msg.data));
+        const answer = await STATE.peerConnection.createAnswer();
+        await STATE.peerConnection.setLocalDescription(answer);
+        socket.emit('signal', { type: 'answer', data: answer });
+    } else if (msg.type === 'answer') {
+        await STATE.peerConnection.setRemoteDescription(new RTCSessionDescription(msg.data));
+    } else if (msg.type === 'candidate') {
+        try {
+            await STATE.peerConnection.addIceCandidate(new RTCIceCandidate(msg.data));
+        } catch (e) { console.error(e); }
     }
 });
 
-sendButton.addEventListener('click', sendMessage);
+window.endCall = () => {
+    if (STATE.mediaStream) {
+        STATE.mediaStream.getTracks().forEach(t => t.stop());
+    }
+    if (STATE.peerConnection) {
+        STATE.peerConnection.close();
+        STATE.peerConnection = null;
+    }
+    STATE.mediaStream = null;
+    els.localVideo.srcObject = null;
+    els.remoteVideo.srcObject = null;
+    els.videoOverlay.classList.add('hidden');
+    document.getElementById('active-call-panel').classList.add('hidden');
+};
+
+// --- UTILS ---
+function showToast(title, msg, type) {
+    const container = document.getElementById('toast-container');
+    const div = document.createElement('div');
+    const bg = type === 'error' ? 'bg-rose-600' : 'bg-blue-600';
+    div.className = `${bg} text-white px-6 py-3 rounded-lg shadow-xl fade-in`;
+    div.innerHTML = `<b>${title}</b><br><span class="text-xs">${msg}</span>`;
+    container.appendChild(div);
+    setTimeout(() => div.remove(), 3000);
+}

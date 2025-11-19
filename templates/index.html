@@ -3,264 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChatHub</title>
+    <title>Nexus Connect | Secure Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* --- Basic Reset & Body --- */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: #f0f2f5; /* Light gray background */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        /* --- Lobby Screen --- */
-        #lobby {
-            width: 100%;
-            max-width: 450px;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            text-align: center;
-        }
-
-        #lobby h1 {
-            color: #333;
-            margin-bottom: 20px;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
-        /* --- MODIFIED: 13+ Text --- */
-        #lobby p {
-            color: #666;
-            margin-bottom: 25px;
-            font-size: 0.9rem;
-        }
-
-        /* --- NEW: Online Counter Style --- */
-        #online-counter {
-            color: #555;
-            font-size: 0.95rem;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        #online-counter span {
-            color: #007bff;
-            font-weight: bold;
-        }
-
-
-        #lobby .form-group {
-            margin-bottom: 15px;
-            text-align: left;
-        }
-
-        #lobby label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #444;
-        }
-
-        #lobby input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 1rem;
-        }
-
-        #lobby button {
-            width: 100%;
-            padding: 12px 25px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1rem;
-            transition: background-color 0.2s ease;
-            margin-top: 10px;
-        }
-
-        #lobby button:hover {
-            background-color: #0056b3;
-        }
-
-        /* --- Chat Container --- */
-        .chat-container {
-            width: 100%;
-            max-width: 650px;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            overflow: hidden; /* Keeps rounded corners */
-            display: none; /* Hidden by default */
-            flex-direction: column;
-            height: 90vh; /* Make the container tall */
-            max-height: 700px;
-        }
-
-        /* --- Header --- */
-        .chat-container h1 {
-            background-color: #007bff;
-            color: white;
-            padding: 16px 20px;
-            font-size: 1.25rem;
-            text-align: center;
-            margin: 0;
-        }
-
-        /* --- Status Bar --- */
-        #status {
-            padding: 10px 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: #555;
-            background-color: #fcfcfc;
-            border-bottom: 1px solid #eee;
-            text-align: center;
-        }
-
-        /* --- Message List (The Chat Box) --- */
-        #chat-box {
-            flex-grow: 1; /* Makes the chat box fill available space */
-            overflow-y: scroll;
-            padding: 20px;
-            background-color: #f9f9f9;
-        }
-
-        ul#messages {
-            list-style: none;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* --- Message Bubbles --- */
-        ul#messages li {
-            padding: 10px 15px;
-            border-radius: 18px;
-            background-color: #e9e9eb; /* Neutral gray for STRANGER */
-            color: #333;
-            max-width: 80%;
-            word-wrap: break-word;
-            align-self: flex-start; /* Stranger messages on left */
-            text-align: left;
-            margin-bottom: 10px;
-            line-height: 1.4;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
         
-        /* --- ADDED FOR YOUR MESSAGES --- */
-        ul#messages li.my-message {
-            background-color: #007bff; /* Blue for USER */
-            color: white;
-            align-self: flex-end; /* User messages on right */
-        }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-
-        /* --- Typing Status --- */
-        #typing-status {
-            font-style: italic;
-            color: #777;
-            padding: 0px 20px 10px;
-            height: 1.2em; /* Reserve space to prevent layout jump */
-        }
-
-
-        /* --- Input Area --- */
-        .input-area {
-            display: flex;
-            padding: 15px;
-            background-color: #ffffff;
-            border-top: 1px solid #ddd;
-        }
-
-        #message-input {
-            flex-grow: 1;
-            padding: 12px 18px;
-            border: 1px solid #ccc;
-            border-radius: 24px; /* Pill shape */
-            margin-right: 10px;
-            font-size: 1rem;
-        }
+        .message-in { align-self: flex-start; background: #1e293b; border-radius: 12px 12px 12px 0; }
+        .message-out { align-self: flex-end; background: #3b82f6; color: white; border-radius: 12px 12px 0 12px; }
         
-        #message-input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-
-        #send-button {
-            padding: 12px 25px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 24px; /* Pill shape */
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1rem;
-            transition: background-color 0.2s ease;
+        .pulse-ring { animation: pulse-blue 2s infinite; }
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
-
-        #send-button:hover {
-            background-color: #0056b3;
-        }
-
     </style>
 </head>
-<body>
+<body class="h-screen w-full overflow-hidden flex flex-col">
 
-    <div id="lobby">
-        <h1>Welcome to ChatHub</h1>
-        
-        <p id="online-counter"><span id="user-count">0</span> people online</p>
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
 
-        <p>Please enter your information to start chatting. You must be 13 or older. By chatting, you confirm you have parental permission.</p>
-        
-        <div class="form-group">
-            <label for="name-input">Your Name:</label>
-            <input type="text" id="name-input" placeholder="Enter your name (letters only)">
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="flex-1 flex items-center justify-center bg-slate-900">
+        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa')] bg-cover bg-center opacity-20"></div>
+        <div class="relative z-10 glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 fade-in">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-600 rounded-full mx-auto flex items-center justify-center mb-4 shadow-lg">
+                    <i class="fas fa-network-wired text-2xl text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-white">Nexus Connect</h1>
+                <p class="text-slate-400 mt-2">Secure P2P & Group Gateway</p>
+            </div>
+
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Display Name</label>
+                    <input type="text" id="username" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-blue-500" placeholder="Letters only (e.g. Alex)" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Age</label>
+                    <input type="number" id="age" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-blue-500" placeholder="13+" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-lg transition-all">Enter Gateway</button>
+            </form>
+            <div class="mt-6 text-center">
+                <span class="text-xs text-emerald-400">
+                    <i class="fas fa-circle text-[8px] animate-pulse mr-1"></i> Online Users: <span id="server-cap-display">...</span>
+                </span>
+            </div>
         </div>
-        
-        <div class="form-group">
-            <label for="age-input">Your Age (13+):</label>
-            <input type="number" id="age-input" placeholder="Enter your age (numbers only)">
-        </div>
-
-        <button id="start-chat-button">Start Chat</button>
     </div>
 
-
-    <div class="chat-container" id="chat-container">
-        
-        <h1>ChatHub</h1>
-        
-        <div id="status">Waiting for a match...</div>
-
-        <div id="chat-box">
-            <ul id="messages"></ul>
+    <!-- APP INTERFACE -->
+    <div id="app-interface" class="hidden h-full flex flex-col md:flex-row bg-slate-900">
+        <!-- Sidebar -->
+        <div class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col z-20">
+            <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+                <h2 class="font-bold text-lg text-white"><i class="fas fa-circle-nodes text-blue-500"></i> Nexus</h2>
+                <div id="user-badge" class="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300 border border-slate-700"></div>
+            </div>
+            <div class="p-4 space-y-4 flex-1 overflow-y-auto">
+                <button id="btn-p2p" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-700 transition-all flex items-center gap-3">
+                    <i class="fas fa-user-secret"></i> Random P2P
+                </button>
+                <button id="btn-group" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-700 transition-all flex items-center gap-3">
+                    <i class="fas fa-users"></i> Group Channels
+                </button>
+                <div id="region-selector" class="hidden space-y-2 pt-4 border-t border-slate-800">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Region</label>
+                    <select id="region-select" class="w-full bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2.5">
+                        <option value="global">Global</option>
+                        <option value="na">North America</option>
+                        <option value="eu">Europe</option>
+                        <option value="asia">Asia</option>
+                    </select>
+                </div>
+                <!-- Call UI -->
+                <div id="active-call-panel" class="hidden p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 mt-4">
+                    <div class="text-xs text-rose-400 font-bold uppercase animate-pulse mb-2">Live Call</div>
+                    <button onclick="endCall()" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg text-sm">End Call</button>
+                </div>
+            </div>
         </div>
-        
-        <div id="typing-status"></div>
 
-        <div class="input-area">
-            <input type="text" id="message-input" placeholder="Type a message...">
-            <button id="send-button">Send</button>
+        <!-- Chat Area -->
+        <div class="flex-1 flex flex-col relative bg-[#0b1120]">
+            <div class="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur">
+                <div class="flex items-center gap-3">
+                    <div id="chat-status-indicator" class="w-3 h-3 bg-slate-500 rounded-full"></div>
+                    <div>
+                        <h3 id="chat-title" class="font-semibold text-white">Idle</h3>
+                        <p id="chat-subtitle" class="text-xs text-slate-400">Select a mode to start</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button id="btn-vc" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"><i class="fas fa-phone"></i></button>
+                    <button id="btn-video" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"><i class="fas fa-video"></i></button>
+                </div>
+            </div>
+
+            <div id="messages-container" class="flex-1 overflow-y-auto p-6 space-y-4 relative">
+                <div id="welcome-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
+                    <i class="fas fa-comments text-6xl mb-4 opacity-20"></i>
+                    <p>Start a conversation</p>
+                </div>
+            </div>
+
+            <!-- Video Overlay -->
+            <div id="video-overlay" class="hidden absolute top-4 right-4 w-64 bg-black rounded-xl border border-slate-700 overflow-hidden z-30 shadow-2xl">
+                <div class="relative aspect-video bg-slate-800">
+                    <video id="remote-video" class="w-full h-full object-cover" autoplay playsinline></video>
+                    <div class="absolute bottom-2 right-2 w-20 aspect-video bg-black rounded-lg border border-white/20 overflow-hidden">
+                        <video id="local-video" class="w-full h-full object-cover transform scale-x-[-1]" autoplay playsinline muted></video>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-900 border-t border-slate-800">
+                <div class="flex items-end gap-2 max-w-4xl mx-auto">
+                    <button id="btn-record" class="p-3 rounded-full bg-slate-800 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-microphone"></i></button>
+                    <div class="flex-1 bg-slate-800 rounded-2xl p-1 flex items-center border border-slate-700">
+                        <input type="text" id="message-input" class="w-full bg-transparent border-none text-white px-4 py-2 focus:ring-0" placeholder="Type a message..." disabled>
+                    </div>
+                    <button id="btn-send" class="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-50"><i class="fas fa-paper-plane"></i></button>
+                </div>
+                <div id="recording-status" class="text-xs text-rose-400 font-bold mt-2 ml-14 hidden">Recording...</div>
+            </div>
         </div>
-
     </div>
 
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="/static/chat.js"></script>
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='chat.js') }}"></script>
 </body>
 </html>

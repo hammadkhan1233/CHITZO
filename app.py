@@ -1,13 +1,11 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
-import time
 
 # --- FLASK SETUP ---
 app = Flask(__name__)
-# Generate a random secret key for session management
 app.config['SECRET_KEY'] = 'a_secure_and_random_secret_key_12345' 
-socketio = SocketIO(app, cors_allowed_origins="*") # Allow all origins for simplicity in development
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # --- SERVER STATE MANAGEMENT ---
 USERS = {} # {sid: {'name': 'Name', 'age': 25, 'mode': 'none', 'room': None}}
@@ -15,9 +13,8 @@ P2P_WAITING = [] # [sid1, sid2, ...] - List of SIDs waiting for P2P match
 ROOMS = {} # {room_id: [sid1, sid2, ...]} - Stores active rooms and their members
 
 def get_online_count():
-    """Calculates the number of connected clients."""
-    # Note: Flask-SocketIO can provide this more directly, but this is a simple check.
-    return len(USERS)
+    """Calculates the number of connected clients who have logged in."""
+    return sum(1 for user in USERS.values() if user['name'] is not None)
 
 def broadcast_stats():
     """Emits the current online user count to everyone."""
@@ -29,7 +26,6 @@ def broadcast_stats():
 @app.route('/')
 def index():
     """Serves the main HTML page (login screen)."""
-    # Note: Make sure your client JS is named 'chat.js' and is in a 'static' folder.
     return render_template('index.html')
 
 # --- SOCKET.IO HANDLERS ---
@@ -38,8 +34,9 @@ def index():
 def handle_connect():
     """Handles new client connections."""
     sid = request.sid
+    # Initialize user state immediately upon connection
     USERS[sid] = {'name': None, 'age': None, 'mode': 'none', 'room': None}
-    print(f"Client connected: {sid}. Total users: {len(USERS)}")
+    print(f"Client connected: {sid}. Total tracked users: {len(USERS)}")
     broadcast_stats()
 
 @socketio.on('disconnect')
@@ -54,36 +51,35 @@ def handle_disconnect():
         # 1. P2P Cleanup
         if user_data['mode'] == 'p2p':
             if room_id in ROOMS:
+                # Remove the disconnecting user
                 ROOMS[room_id].remove(sid)
+                
+                # Check if only one person remains (the partner)
                 if len(ROOMS[room_id]) == 1:
-                    # Notify the remaining partner
                     partner_sid = ROOMS[room_id][0]
-                    emit('peer_disconnected', room=partner_sid)
+                    emit('peer_disconnected', room=partner_sid) # Notify partner
                     
-                    # Remove the partner from the room and put them back in waiting
+                    # Clean up partner's state (put them back in the waiting list)
                     partner_data = USERS.get(partner_sid)
                     if partner_data:
-                        partner_data['room'] = None
-                        partner_data['mode'] = 'p2p'
+                        partner_data.update({'room': None, 'mode': 'p2p'})
                         P2P_WAITING.append(partner_sid)
                     
-                    del ROOMS[room_id]
-                else:
-                    # Should not happen in a strict P2P room, but good for safety
-                    leave_room(room_id)
+                    del ROOMS[room_id] # Destroy the P2P room
+                
+                leave_room(room_id)
         
         # 2. Group Cleanup
         elif user_data['mode'] == 'group':
             leave_room(room_id)
-            if room_id in ROOMS:
+            if room_id in ROOMS and sid in ROOMS[room_id]:
                 ROOMS[room_id].remove(sid)
-                # Group room cleanup is often simpler (no need to notify the single partner)
 
     # 3. Cleanup P2P Waiting List
     if sid in P2P_WAITING:
         P2P_WAITING.remove(sid)
 
-    print(f"Client disconnected: {sid}. Remaining users: {len(USERS)}")
+    print(f"Client disconnected: {sid}. Remaining tracked users: {len(USERS)}")
     broadcast_stats()
 
 # --- LOGIN & MODE HANDLERS ---
@@ -99,9 +95,9 @@ def handle_login(data):
         return emit('login_error', {'msg': 'Name and Age are required.'})
 
     if sid in USERS:
-        USERS[sid]['name'] = name
-        USERS[sid]['age'] = int(age) # Convert to int
+        USERS[sid].update({'name': name, 'age': int(age)})
         emit('login_success', {'name': name})
+        broadcast_stats() # Update count since a user successfully logged in
     else:
         emit('login_error', {'msg': 'Connection error. Please refresh.'})
 
@@ -116,19 +112,16 @@ def handle_join_p2p():
     # Clear previous room/mode state
     if USERS[sid]['room']:
         leave_room(USERS[sid]['room'])
-        USERS[sid]['room'] = None
+        USERS[sid].update({'room': None, 'mode': 'none'})
     
     # Check if a partner is waiting
     if P2P_WAITING:
         partner_sid = P2P_WAITING.pop(0)
         
-        # Ensure partner is still valid and not the current user
-        if partner_sid == sid:
-            P2P_WAITING.append(partner_sid) # Put back if somehow self-matched
-            return emit('p2p_waiting', {'msg': 'Searching for a partner...'})
-        
         partner_data = USERS.get(partner_sid)
         if not partner_data:
+             # Partner disconnected while waiting, put user back in line
+            P2P_WAITING.append(sid)
             return emit('p2p_waiting', {'msg': 'Searching for a partner...'})
 
         # 1. Create a new room
@@ -151,6 +144,7 @@ def handle_join_p2p():
         # Add user to waiting list
         if sid not in P2P_WAITING:
             P2P_WAITING.append(sid)
+        USERS[sid]['mode'] = 'p2p'
         emit('p2p_waiting', {'msg': 'Searching for a partner...'})
 
 @socketio.on('join_group')
@@ -167,6 +161,8 @@ def handle_join_group(data):
     # Clear previous room/mode state
     if user_data['room']:
         leave_room(user_data['room'])
+        if user_data['room'] in ROOMS and sid in ROOMS[user_data['room']]:
+             ROOMS[user_data['room']].remove(sid)
 
     # 1. Update state
     user_data.update({'mode': 'group', 'room': room_id})
@@ -182,59 +178,28 @@ def handle_join_group(data):
     # 3. Notify the user
     emit('group_joined', {'region': region, 'room': room_id}, room=sid)
 
-# --- MESSAGING & SIGNALING ---
+# --- MESSAGING ---
 
 @socketio.on('send_message')
 def handle_send_message(data):
-    """Relays text or audio messages to the room."""
+    """Relays text messages to the room."""
     sid = request.sid
     user_data = USERS.get(sid)
     
-    if not user_data or not user_data['room']:
-        return # Ignore message if not in a room
+    # Only process if it's a text message and the user is in a room
+    if not user_data or not user_data['room'] or 'text' not in data:
+        return 
         
     room_id = user_data['room']
     name = user_data['name']
+    message = data['text']
 
-    # Text Message
-    if 'text' in data:
-        message = data['text']
-        # Send to sender (isSelf: true)
-        emit('message', {'text': message, 'user': name, 'isSelf': True}, room=sid)
-        # Send to others in the room (isSelf: false)
-        emit('message', {'text': message, 'user': name, 'isSelf': False}, room=room_id, skip_sid=sid)
-    
-    # Audio Message (Base64)
-    elif 'audio' in data:
-        audio_data = data['audio']
-        # Send to sender (isSelf: true)
-        emit('message', {'audio': audio_data, 'user': name, 'isSelf': True}, room=sid)
-        # Send to others in the room (isSelf: false)
-        emit('message', {'audio': audio_data, 'user': name, 'isSelf': False}, room=room_id, skip_sid=sid)
-
-@socketio.on('signal')
-def handle_signal(data):
-    """Relays WebRTC signaling data (offer, answer, candidate) between P2P partners."""
-    sid = request.sid
-    user_data = USERS.get(sid)
-
-    if not user_data or user_data['mode'] != 'p2p' or not user_data['room']:
-        return # Only relay signals in active P2P rooms
-
-    room_id = user_data['room']
-    
-    # Find the recipient (the other user in the P2P room)
-    if room_id in ROOMS and len(ROOMS[room_id]) == 2:
-        recipient_sid = next(s for s in ROOMS[room_id] if s != sid)
-        
-        # Relay the signal data directly to the partner
-        emit('signal', {'type': data['type'], 'data': data['data']}, room=recipient_sid)
-    else:
-        # If the partner is missing or the room is invalid, end the call
-        emit('peer_disconnected', room=sid)
+    # Send to sender (isSelf: true)
+    emit('message', {'text': message, 'user': name, 'isSelf': True}, room=sid)
+    # Send to others in the room (isSelf: false)
+    emit('message', {'text': message, 'user': name, 'isSelf': False}, room=room_id, skip_sid=sid)
 
 # --- START APPLICATION ---
 if __name__ == '__main__':
-    # Flask-SocketIO runs the application
     print("Starting Nexus Connect Server on http://127.0.0.1:5000")
     socketio.run(app, debug=True)

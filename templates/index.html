@@ -17,8 +17,8 @@
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .message-in { align-self: flex-start; background: #1e293b; border-radius: 12px 12px 12px 0; }
-        .message-out { align-self: flex-end; background: #3b82f6; color: white; border-radius: 12px 12px 0 12px; }
+        /* Custom message styles removed to allow flex/tailwind to handle position/color */
+        /* .message-in and .message-out are now handled by classes in JS's addMessage function */
         
         .glass-panel {
             background: rgba(30, 41, 59, 0.7);
@@ -37,7 +37,6 @@
 
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
 
-    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="flex-1 flex items-center justify-center bg-slate-900">
         <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa')] bg-cover bg-center opacity-20"></div>
         <div class="relative z-10 glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 fade-in">
@@ -68,9 +67,7 @@
         </div>
     </div>
 
-    <!-- APP INTERFACE -->
     <div id="app-interface" class="hidden h-full flex flex-col md:flex-row bg-slate-900">
-        <!-- Sidebar -->
         <div class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col z-20">
             <div class="p-5 border-b border-slate-800 flex justify-between items-center">
                 <h2 class="font-bold text-lg text-white"><i class="fas fa-circle-nodes text-blue-500"></i> Nexus</h2>
@@ -92,15 +89,13 @@
                         <option value="asia">Asia</option>
                     </select>
                 </div>
-                <!-- Call UI -->
                 <div id="active-call-panel" class="hidden p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 mt-4">
                     <div class="text-xs text-rose-400 font-bold uppercase animate-pulse mb-2">Live Call</div>
-                    <button onclick="endCall()" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg text-sm">End Call</button>
+                    <button id="btn-end-call" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg text-sm">End Call</button>
                 </div>
             </div>
         </div>
 
-        <!-- Chat Area -->
         <div class="flex-1 flex flex-col relative bg-[#0b1120]">
             <div class="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur">
                 <div class="flex items-center gap-3">
@@ -116,14 +111,13 @@
                 </div>
             </div>
 
-            <div id="messages-container" class="flex-1 overflow-y-auto p-6 space-y-4 relative">
+            <div id="messages-container" class="flex-1 overflow-y-auto p-6 flex flex-col relative">
                 <div id="welcome-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
                     <i class="fas fa-comments text-6xl mb-4 opacity-20"></i>
                     <p>Start a conversation</p>
                 </div>
             </div>
 
-            <!-- Video Overlay -->
             <div id="video-overlay" class="hidden absolute top-4 right-4 w-64 bg-black rounded-xl border border-slate-700 overflow-hidden z-30 shadow-2xl">
                 <div class="relative aspect-video bg-slate-800">
                     <video id="remote-video" class="w-full h-full object-cover" autoplay playsinline></video>
@@ -146,8 +140,7 @@
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="{{ url_for('static', filename='chat.js') }}"></script>
+    <script src="/static/chat.js"></script> 
 </body>
 </html>

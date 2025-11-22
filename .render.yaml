@@ -2,12 +2,7 @@ services:
   - type: web
     name: omegle-clone
     env: python
-    # 1. CRITICAL: Install all dependencies from requirements.txt
+    # Ensure dependencies are installed
     buildCommand: "pip install -r requirements.txt"
-    # 2. Start the application using Gunicorn with the asynchronous eventlet worker, 
-    #    binding to the required host and port.
+    # Use the asynchronous eventlet worker for SocketIO
     startCommand: "gunicorn app:app --worker-class eventlet -b 0.0.0.0:$PORT"
-    # 3. Optional: Set a health check path (e.g., if you have a simple / route in Flask)
-    # healthCheckPath: /
-    # 4. Optional: Increase the CPU/Memory for better performance if needed
-    # plan: standard

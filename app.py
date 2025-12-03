@@ -5,12 +5,12 @@ import uuid
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# Initialize SocketIO with gevent async_mode automatically
+# --- UPDATED LINE: Use gevent ---
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # --- Global State ---
 waiting_queue = [] 
-active_pairs = {} # Maps user_sid -> room_id
+active_pairs = {} 
 
 @app.route('/')
 def index():
@@ -23,11 +23,11 @@ def on_connect():
 @socketio.on('disconnect')
 def on_disconnect():
     sid = request.sid
-    print(f"User disconnected: {sid}")
-    
+    # Remove from waiting list
     if sid in waiting_queue:
         waiting_queue.remove(sid)
     
+    # Remove from active chat
     if sid in active_pairs:
         room_id = active_pairs[sid]
         emit('partner_left', room=room_id, include_self=False)
@@ -40,6 +40,7 @@ def on_search():
         return
 
     if len(waiting_queue) > 0:
+        # Match found!
         partner_sid = waiting_queue.pop(0)
         room_id = str(uuid.uuid4())
         
@@ -51,6 +52,7 @@ def on_search():
         
         emit('matched', {'room_id': room_id}, room=room_id)
     else:
+        # No match, wait in queue
         waiting_queue.append(sid)
         emit('waiting')
 

@@ -1,8 +1,7 @@
 services:
   - type: web
-    name: omegle-clone
+    name: random-chat-flask
     env: python
-    # Ensure dependencies are installed
-    buildCommand: "pip install -r requirements.txt"
-    # Use the asynchronous eventlet worker for SocketIO
-    startCommand: "gunicorn app:app --worker-class eventlet -b 0.0.0.0:$PORT"
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 app:app
+    plan: free

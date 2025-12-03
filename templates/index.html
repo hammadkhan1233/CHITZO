@@ -3,97 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHITZO</title>
+    <title>CHITZO | Live Chat</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
     <style>
-        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background-color: #f0f2f5; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .chat-container { width: 100%; max-width: 450px; background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; height: 90vh; }
         
-        /* Chat Window */
-        #messages { flex: 1; overflow-y: scroll; padding: 20px; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+        .chat-header { background: #6c5ce7; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 1.2rem; letter-spacing: 1px; }
         
-        /* Message Bubbles */
-        .msg { padding: 10px 15px; border-radius: 15px; max-width: 80%; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .my-msg { align-self: flex-end; background-color: #6c5ce7; color: white; border-bottom-right-radius: 2px; }
-        .other-msg { align-self: flex-start; background-color: white; color: black; border-bottom-left-radius: 2px; }
+        #messages { list-style-type: none; margin: 0; padding: 20px; flex: 1; overflow-y: scroll; display: flex; flex-direction: column; gap: 10px; background-color: #fff; }
         
-        .user-label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.8; }
-
-        /* Typing Indicator */
-        #typing-indicator { height: 20px; padding-left: 20px; font-size: 0.8rem; color: #888; font-style: italic; background: #e0e0e0; }
-
-        /* Input Area */
-        #input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #ddd; }
-        #myMessage { flex: 1; padding: 12px; border-radius: 20px; border: 1px solid #ddd; outline: none; font-size: 1rem; }
-        #sendBtn { margin-left: 10px; padding: 0 20px; background: #6c5ce7; color: white; border: none; border-radius: 20px; font-weight: bold; }
+        .message-bubble { padding: 10px 15px; border-radius: 20px; max-width: 75%; word-wrap: break-word; font-size: 0.95rem; display: flex; flex-direction: column; }
+        
+        .my-message { align-self: flex-end; background-color: #6c5ce7; color: white; border-bottom-right-radius: 2px; }
+        .other-message { align-self: flex-start; background-color: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
+        
+        .username { font-size: 0.7rem; margin-bottom: 2px; opacity: 0.7; font-weight: bold; }
+        .timestamp { font-size: 0.6rem; margin-top: 5px; opacity: 0.7; align-self: flex-end; }
+        
+        .input-area { padding: 15px; background: #fff; border-top: 1px solid #ddd; display: flex; gap: 10px; }
+        #myMessage { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; outline: none; font-size: 1rem; }
+        #sendBtn { background: #6c5ce7; color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        #sendBtn:hover { background: #5649c0; }
     </style>
 </head>
 <body>
 
-    <ul id="messages"></ul>
-    
-    <div id="typing-indicator"></div>
-
-    <div id="input-area">
-        <input type="text" id="myMessage" placeholder="Type a message..." autocomplete="off">
-        <button id="sendBtn">Send</button>
+    <div class="chat-container">
+        <div class="chat-header">CHITZO</div>
+        <ul id="messages"></ul>
+        <div class="input-area">
+            <input type="text" id="myMessage" placeholder="Type a message..." autocomplete="off">
+            <button id="sendBtn">➤</button>
+        </div>
     </div>
 
     <script>
         $(document).ready(function() {
+            // Connect to the server
             var socket = io();
-            var username = prompt("Enter your Name:") || "Anonymous";
+            
+            // Simple Prompt for Username
+            var username = prompt("Enter your Chat Name:") || "Anonymous";
 
-            // 1. Receive Messages
             socket.on('message', function(msg) {
                 var data = JSON.parse(msg);
                 var isMe = data.user === username;
-                var styleClass = isMe ? 'my-msg' : 'other-msg';
-                var displayUser = isMe ? 'You' : data.user;
+                
+                var className = isMe ? 'my-message' : 'other-message';
+                var userDisplay = isMe ? 'You' : data.user;
+                var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                 $('#messages').append(`
-                    <li class="msg ${styleClass}">
-                        <span class="user-label">${displayUser}</span>
+                    <li class="message-bubble ${className}">
+                        <span class="username">${userDisplay}</span>
                         ${data.text}
+                        <span class="timestamp">${time}</span>
                     </li>
                 `);
                 
-                // Auto-scroll to bottom
-                window.scrollTo(0, document.body.scrollHeight);
+                // Scroll to bottom
+                var chatBox = document.getElementById("messages");
+                chatBox.scrollTop = chatBox.scrollHeight;
             });
 
-            // 2. Handle Typing Events
-            var typingTimer;
-            
-            // When I type, tell the server
-            $('#myMessage').on('input', function() {
-                socket.emit('typing', username);
-            });
-
-            // When server says someone is typing
-            socket.on('typing', function(user) {
-                $('#typing-indicator').text(user + " is typing...");
-                
-                // Clear text after 1 second of silence
-                clearTimeout(typingTimer);
-                typingTimer = setTimeout(function() {
-                    $('#typing-indicator').text('');
-                }, 1000);
-            });
-
-            // 3. Send Message Logic
             function sendMessage() {
-                var txt = $('#myMessage').val();
-                if(txt.trim()) {
-                    var data = JSON.stringify({user: username, text: txt});
+                var text = $('#myMessage').val();
+                if(text.trim() !== "") {
+                    var data = JSON.stringify({ "user": username, "text": text });
                     socket.send(data);
                     $('#myMessage').val('');
                 }
             }
 
-            $('#sendBtn').click(sendMessage);
+            $('#sendBtn').on('click', sendMessage);
 
-            $('#myMessage').keypress(function(e) {
+            $('#myMessage').on('keypress', function(e) {
                 if(e.which == 13) sendMessage();
             });
         });

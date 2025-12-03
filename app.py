@@ -1,167 +1,99 @@
 from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit, join_room, leave_room
-import os
+from flask_socketio import SocketIO, emit, join_room, leave_room, close_room
+import uuid
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# --- GLOBAL STATE ---
-# Queue for 1-on-1 matching: stores (sid, name)
-match_queue = []
+# --- Global State ---
+# In a real production app with many workers, use Redis. 
+# For a single worker (standard free tier), this list works fine.
+waiting_queue = [] 
+active_pairs = {} # Maps user_sid -> room_id
 
-# Global set for total online count (all users)
-connected_users = set()
-
-# Mappings to track user state
-sid_to_name = {}    # sid -> name
-sid_to_room = {}    # sid -> room_id (used for both 1-on-1 and Group)
-sid_to_mode = {}    # sid -> '1on1' or 'group'
-
-GROUP_ROOM_ID = 'global_group_chat'
-
-def broadcast_user_count():
-    """Broadcasts the total number of connected users to everyone."""
-    count = len(connected_users)
-    emit('update_user_count', {'count': count}, broadcast=True)
-
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-# --- SOCKET EVENTS ---
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @socketio.on('connect')
-def handle_connect():
-    print(f"Client connected: {request.sid}")
-    connected_users.add(request.sid)
-    broadcast_user_count()
-
-@socketio.on('join_chat')
-def handle_join_chat(data):
-    """
-    Main entry point. 
-    data expects: {'name': '...', 'mode': '1on1' or 'group'}
-    """
-    user_sid = request.sid
-    name = data.get('name', 'Stranger')
-    mode = data.get('mode', '1on1')
-    
-    sid_to_name[user_sid] = name
-    sid_to_mode[user_sid] = mode
-
-    print(f"User {name} ({user_sid}) joining mode: {mode}")
-
-    if mode == 'group':
-        # --- GROUP CHAT LOGIC ---
-        join_room(GROUP_ROOM_ID)
-        sid_to_room[user_sid] = GROUP_ROOM_ID
-        
-        # Notify user they joined
-        emit('match_found', {'message': 'Welcome to the Global Group Chat! Say hello.'})
-        
-        # Notify others in group
-        emit('new_message', {
-            'name': 'System', 
-            'message': f'{name} has joined the group.',
-            'is_system': True
-        }, room=GROUP_ROOM_ID, skip_sid=user_sid)
-
-    else:
-        # --- 1-ON-1 LOGIC ---
-        # Add to queue
-        match_queue.append((user_sid, name))
-        emit('match_found', {'message': 'Waiting for a match...'})
-        
-        # Check if we can match
-        if len(match_queue) >= 2:
-            user1 = match_queue.pop(0)
-            user2 = match_queue.pop(0)
-            
-            u1_sid, u1_name = user1
-            u2_sid, u2_name = user2
-            
-            room_id = f"{u1_sid}_{u2_sid}"
-            
-            join_room(room_id, sid=u1_sid)
-            join_room(room_id, sid=u2_sid)
-            
-            sid_to_room[u1_sid] = room_id
-            sid_to_room[u2_sid] = room_id
-            
-            emit('match_found', {'message': f'Matched with {u2_name}!'}, room=u1_sid)
-            emit('match_found', {'message': f'Matched with {u1_name}!'}, room=u2_sid)
-
-@socketio.on('message')
-def handle_message(data):
-    user_sid = request.sid
-    room_id = sid_to_room.get(user_sid)
-    name = sid_to_name.get(user_sid, 'Stranger')
-    msg_content = data.get('message')
-
-    if room_id and msg_content:
-        # Broadcast to the room (Group or 1-on-1)
-        # We skip_sid so the sender doesn't get their own message back 
-        # (since they added it to their UI immediately)
-        emit('new_message', {
-            'name': name,
-            'message': msg_content
-        }, room=room_id, skip_sid=user_sid)
-
-@socketio.on('typing')
-def handle_typing():
-    # Only useful for 1-on-1 usually, but can work for group if desired.
-    # For now, let's limit typing indicators to 1-on-1 to avoid group chaos.
-    user_sid = request.sid
-    mode = sid_to_mode.get(user_sid)
-    room_id = sid_to_room.get(user_sid)
-    
-    if mode == '1on1' and room_id:
-        emit('stranger_typing', room=room_id, skip_sid=user_sid)
-
-@socketio.on('stop_typing')
-def handle_stop_typing():
-    user_sid = request.sid
-    mode = sid_to_mode.get(user_sid)
-    room_id = sid_to_room.get(user_sid)
-    
-    if mode == '1on1' and room_id:
-        emit('stranger_stopped_typing', room=room_id, skip_sid=user_sid)
+def on_connect():
+    print(f"User connected: {request.sid}")
 
 @socketio.on('disconnect')
-def handle_disconnect():
-    global match_queue
-    user_sid = request.sid
+def on_disconnect():
+    sid = request.sid
+    print(f"User disconnected: {sid}")
     
-    connected_users.discard(user_sid)
-    broadcast_user_count()
+    # Remove from waiting queue if there
+    if sid in waiting_queue:
+        waiting_queue.remove(sid)
+    
+    # If in a chat, notify partner
+    if sid in active_pairs:
+        room_id = active_pairs[sid]
+        # Notify the room (which includes the partner)
+        emit('partner_left', room=room_id, include_self=False)
+        # Cleanup
+        del active_pairs[sid]
+        # We don't delete the partner's entry yet; they handle their own 'leave' or 'next'
 
-    name = sid_to_name.get(user_sid, 'Stranger')
-    mode = sid_to_mode.get(user_sid)
-    room_id = sid_to_room.get(user_sid)
+@socketio.on('search')
+def on_search():
+    sid = request.sid
+    
+    # If already searching or chatting, ignore
+    if sid in waiting_queue:
+        return
 
-    # Clean up maps
-    if user_sid in sid_to_name: del sid_to_name[user_sid]
-    if user_sid in sid_to_mode: del sid_to_mode[user_sid]
-    if user_sid in sid_to_room: del sid_to_room[user_sid]
-
-    # Handle Specific Mode Cleanup
-    if mode == '1on1':
-        # Remove from queue if waiting
-        match_queue = [u for u in match_queue if u[0] != user_sid]
+    # If someone else is waiting
+    if len(waiting_queue) > 0:
+        partner_sid = waiting_queue.pop(0)
         
-        # Notify partner if matched
-        if room_id:
-            emit('user_disconnected', {'message': 'Stranger has disconnected.'}, room=room_id)
-            # Remove partner's room mapping so they can rejoin queue cleanly
-            # (The frontend will trigger a re-join)
-    
-    elif mode == 'group':
-        if room_id == GROUP_ROOM_ID:
-            emit('new_message', {
-                'name': 'System',
-                'message': f'{name} left the group.',
-                'is_system': True
-            }, room=GROUP_ROOM_ID)
+        # Create a unique room
+        room_id = str(uuid.uuid4())
+        
+        # Join both to the room
+        join_room(room_id, sid=sid)
+        join_room(room_id, sid=partner_sid)
+        
+        # Record the session
+        active_pairs[sid] = room_id
+        active_pairs[partner_sid] = room_id
+        
+        # Notify both
+        emit('matched', {'room_id': room_id, 'role': 'connector'}, room=room_id)
+        
+    else:
+        # No one waiting, add self to queue
+        waiting_queue.append(sid)
+        emit('waiting')
 
-if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), allow_unsafe_werkzeug=True)
+@socketio.on('send_message')
+def on_message(data):
+    sid = request.sid
+    msg = data.get('message')
+    if sid in active_pairs and msg:
+        room_id = active_pairs[sid]
+        emit('receive_message', {'message': msg, 'sender': sid}, room=room_id)
+
+@socketio.on('next_partner')
+def on_next():
+    sid = request.sid
+    
+    # Leave current room if exists
+    if sid in active_pairs:
+        room_id = active_pairs[sid]
+        leave_room(room_id)
+        emit('partner_left', room=room_id, include_self=False)
+        del active_pairs[sid]
+    
+    # Remove from queue if exists (reset)
+    if sid in waiting_queue:
+        waiting_queue.remove(sid)
+        
+    # Start searching again immediately
+    on_search()
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)

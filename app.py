@@ -1,82 +1,25 @@
 from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit, join_room, leave_room
-import uuid
+from flask_socketio import SocketIO, send, emit
+import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-
-# --- UPDATED LINE: Use gevent ---
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
-
-# --- Global State ---
-waiting_queue = [] 
-active_pairs = {} 
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'secret')
+# cors_allowed_origins="*" is important for Render
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@socketio.on('connect')
-def on_connect():
-    print(f"User connected: {request.sid}")
+@socketio.on('message')
+def handleMessage(msg):
+    # Broadcast the message to everyone
+    send(msg, broadcast=True)
 
-@socketio.on('disconnect')
-def on_disconnect():
-    sid = request.sid
-    # Remove from waiting list
-    if sid in waiting_queue:
-        waiting_queue.remove(sid)
-    
-    # Remove from active chat
-    if sid in active_pairs:
-        room_id = active_pairs[sid]
-        emit('partner_left', room=room_id, include_self=False)
-        del active_pairs[sid]
-
-@socketio.on('search')
-def on_search():
-    sid = request.sid
-    if sid in waiting_queue:
-        return
-
-    if len(waiting_queue) > 0:
-        # Match found!
-        partner_sid = waiting_queue.pop(0)
-        room_id = str(uuid.uuid4())
-        
-        join_room(room_id, sid=sid)
-        join_room(room_id, sid=partner_sid)
-        
-        active_pairs[sid] = room_id
-        active_pairs[partner_sid] = room_id
-        
-        emit('matched', {'room_id': room_id}, room=room_id)
-    else:
-        # No match, wait in queue
-        waiting_queue.append(sid)
-        emit('waiting')
-
-@socketio.on('send_message')
-def on_message(data):
-    sid = request.sid
-    msg = data.get('message')
-    if sid in active_pairs and msg:
-        room_id = active_pairs[sid]
-        emit('receive_message', {'message': msg, 'sender': sid}, room=room_id)
-
-@socketio.on('next_partner')
-def on_next():
-    sid = request.sid
-    if sid in active_pairs:
-        room_id = active_pairs[sid]
-        leave_room(room_id)
-        emit('partner_left', room=room_id, include_self=False)
-        del active_pairs[sid]
-    
-    if sid in waiting_queue:
-        waiting_queue.remove(sid)
-        
-    on_search()
+@socketio.on('typing')
+def handle_typing(username):
+    # Broadcast that someone is typing, but NOT to the person typing
+    emit('typing', username, broadcast=True, include_self=False)
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app)

@@ -3,43 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random Chat</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- Load Socket.IO client -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <title>CHITZO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background-color: #f0f2f5; }
+        
+        /* Chat Window */
+        #messages { flex: 1; overflow-y: scroll; padding: 20px; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Message Bubbles */
+        .msg { padding: 10px 15px; border-radius: 15px; max-width: 80%; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .my-msg { align-self: flex-end; background-color: #6c5ce7; color: white; border-bottom-right-radius: 2px; }
+        .other-msg { align-self: flex-start; background-color: white; color: black; border-bottom-left-radius: 2px; }
+        
+        .user-label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; display: block; opacity: 0.8; }
+
+        /* Typing Indicator */
+        #typing-indicator { height: 20px; padding-left: 20px; font-size: 0.8rem; color: #888; font-style: italic; background: #e0e0e0; }
+
+        /* Input Area */
+        #input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #ddd; }
+        #myMessage { flex: 1; padding: 12px; border-radius: 20px; border: 1px solid #ddd; outline: none; font-size: 1rem; }
+        #sendBtn { margin-left: 10px; padding: 0 20px; background: #6c5ce7; color: white; border: none; border-radius: 20px; font-weight: bold; }
+    </style>
 </head>
 <body>
 
-    <!-- SCREEN 1: LANDING -->
-    <div id="landing-screen" class="screen active">
-        <h1>Random Chat</h1>
-        <p>Talk to strangers randomly.</p>
-        <button id="start-btn">Start Chatting</button>
+    <ul id="messages"></ul>
+    
+    <div id="typing-indicator"></div>
+
+    <div id="input-area">
+        <input type="text" id="myMessage" placeholder="Type a message..." autocomplete="off">
+        <button id="sendBtn">Send</button>
     </div>
 
-    <!-- SCREEN 2: WAITING -->
-    <div id="waiting-screen" class="screen">
-        <div class="loader"></div>
-        <h2>Looking for someone...</h2>
-        <button id="cancel-btn">Cancel</button>
-    </div>
+    <script>
+        $(document).ready(function() {
+            var socket = io();
+            var username = prompt("Enter your Name:") || "Anonymous";
 
-    <!-- SCREEN 3: CHAT -->
-    <div id="chat-screen" class="screen">
-        <div class="chat-header">
-            <span id="status-text">Connected to Stranger</span>
-            <button id="next-btn">Next</button>
-        </div>
-        <div id="messages" class="chat-messages">
-            <!-- Messages go here -->
-        </div>
-        <div class="chat-input">
-            <input type="text" id="msg-input" placeholder="Type a message..." autocomplete="off">
-            <button id="send-btn">Send</button>
-        </div>
-    </div>
+            // 1. Receive Messages
+            socket.on('message', function(msg) {
+                var data = JSON.parse(msg);
+                var isMe = data.user === username;
+                var styleClass = isMe ? 'my-msg' : 'other-msg';
+                var displayUser = isMe ? 'You' : data.user;
 
-    <script src="{{ url_for('static', filename='chat.js') }}"></script>
+                $('#messages').append(`
+                    <li class="msg ${styleClass}">
+                        <span class="user-label">${displayUser}</span>
+                        ${data.text}
+                    </li>
+                `);
+                
+                // Auto-scroll to bottom
+                window.scrollTo(0, document.body.scrollHeight);
+            });
+
+            // 2. Handle Typing Events
+            var typingTimer;
+            
+            // When I type, tell the server
+            $('#myMessage').on('input', function() {
+                socket.emit('typing', username);
+            });
+
+            // When server says someone is typing
+            socket.on('typing', function(user) {
+                $('#typing-indicator').text(user + " is typing...");
+                
+                // Clear text after 1 second of silence
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(function() {
+                    $('#typing-indicator').text('');
+                }, 1000);
+            });
+
+            // 3. Send Message Logic
+            function sendMessage() {
+                var txt = $('#myMessage').val();
+                if(txt.trim()) {
+                    var data = JSON.stringify({user: username, text: txt});
+                    socket.send(data);
+                    $('#myMessage').val('');
+                }
+            }
+
+            $('#sendBtn').click(sendMessage);
+
+            $('#myMessage').keypress(function(e) {
+                if(e.which == 13) sendMessage();
+            });
+        });
+    </script>
 </body>
 </html>
-

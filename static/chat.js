@@ -1,149 +1,153 @@
-// --- LOBBY ELEMENTS ---
+// --- ELEMENTS ---
 const lobby = document.getElementById('lobby');
-const startChatButton = document.getElementById('start-chat-button');
+const btn1on1 = document.getElementById('btn-1on1');
+const btnGroup = document.getElementById('btn-group');
 const nameInput = document.getElementById('name-input');
 const ageInput = document.getElementById('age-input');
-const userCountDisplay = document.getElementById('user-count'); // NEW: For online count
+const userCountDisplay = document.getElementById('user-count');
 
-// --- CHAT ELEMENTS ---
 const chatContainer = document.getElementById('chat-container');
+const chatHeader = document.getElementById('chat-header');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
 const messagesList = document.getElementById('messages');
 const statusBox = document.getElementById('status');
 const typingStatus = document.getElementById('typing-status');
 
-let socket = io(); // NEW: Connect on page load to get user count
-let currentName; // NEW: Store name globally for reconnect
+let socket = io();
+let currentName = '';
+let currentMode = ''; // '1on1' or 'group'
 let typingTimer;
 
-// --- LOBBY LOGIC ---
-startChatButton.addEventListener('click', () => {
-    currentName = nameInput.value.trim(); // Use global variable
+// --- VALIDATION HELPER ---
+function validateAndStart(mode) {
+    const name = nameInput.value.trim();
     const age = parseInt(ageInput.value, 10);
-    
-    // REQ 2: Validate name (letters and spaces only)
     const nameRegex = /^[A-Za-z\s]+$/;
-    if (currentName === '' || !nameRegex.test(currentName)) {
-        alert('Please enter your name (letters and spaces only).');
+
+    if (name === '' || !nameRegex.test(name)) {
+        alert('Please enter a valid name (letters only).');
         return;
     }
 
-    // REQ 3 & 4: Validate age (13+, numbers only)
     if (isNaN(age) || age < 13) {
-        alert('You must be 13 or older to chat.');
+        alert('You must be 13 or older.');
         return;
     }
 
-    // --- REQ 1: Pop-up message removed ---
-
-    // Hide lobby and show chat
+    // Success - Start Chat
+    currentName = name;
+    currentMode = mode;
+    
     lobby.style.display = 'none';
     chatContainer.style.display = 'flex';
+    
+    // Update Header Color/Text based on mode
+    if (mode === 'group') {
+        chatHeader.textContent = "Global Group Chat";
+        chatHeader.style.backgroundColor = "#28a745"; // Green
+        statusBox.textContent = "Joining group...";
+    } else {
+        chatHeader.textContent = "1-on-1 Chat";
+        chatHeader.style.backgroundColor = "#007bff"; // Blue
+        statusBox.textContent = "Waiting for a match...";
+    }
 
-    // NOW join the queue
-    statusBox.textContent = 'Waiting for a match...';
-    messagesList.innerHTML = ''; // Clear old messages
-    socket.emit('join_queue', { name: currentName });
-});
+    messagesList.innerHTML = '';
+    
+    // Emit join event with mode
+    socket.emit('join_chat', { name: currentName, mode: currentMode });
+}
 
+// --- LISTENERS ---
+btn1on1.addEventListener('click', () => validateAndStart('1on1'));
+btnGroup.addEventListener('click', () => validateAndStart('group'));
 
-// --- GLOBAL SOCKET LOGIC (runs on page load) ---
-
+// --- SOCKET EVENTS ---
 socket.on('connect', () => {
-    console.log('Connected with ID:', socket.id);
-    // Client will automatically get a user count broadcast
+    console.log('Connected:', socket.id);
 });
 
-// REQ 7: Listen for user count updates
 socket.on('update_user_count', (data) => {
     userCountDisplay.textContent = data.count;
 });
 
 socket.on('match_found', (data) => {
     statusBox.textContent = data.message;
-    messagesList.innerHTML = '';
     typingStatus.textContent = '';
 });
 
 socket.on('new_message', (data) => {
-    // This is a message from the STRANGER
     const item = document.createElement('li');
-    item.textContent = `${data.name}: ${data.message}`;
+    
+    if (data.is_system) {
+        // System messages (joined/left group)
+        item.textContent = data.message;
+        item.classList.add('system-message');
+    } else {
+        // Normal messages
+        item.textContent = `${data.name}: ${data.message}`;
+    }
+    
     messagesList.appendChild(item);
-    // Scroll to bottom
     messagesList.scrollTop = messagesList.scrollHeight;
 });
 
-// REQ 8: Auto-reconnect on disconnect
 socket.on('user_disconnected', (data) => {
+    // This mostly applies to 1-on-1
     const item = document.createElement('li');
     item.textContent = data.message;
     item.style.color = 'red';
     item.style.fontStyle = 'italic';
     messagesList.appendChild(item);
     
-    // NEW: Auto-reconnect logic
-    statusBox.textContent = 'Stranger disconnected. Finding a new match...';
-    typingStatus.textContent = '';
+    statusBox.textContent = 'Stranger disconnected. Finding new match...';
     
-    // Re-join the queue using the stored name
-    socket.emit('join_queue', { name: currentName });
+    // Auto-reconnect if in 1-on-1 mode
+    if (currentMode === '1on1') {
+        setTimeout(() => {
+            socket.emit('join_chat', { name: currentName, mode: '1on1' });
+        }, 1500);
+    }
 });
 
-// --- TYPING INDICATOR LISTENERS ---
 socket.on('stranger_typing', () => {
     typingStatus.textContent = 'Stranger is typing...';
 });
-
 socket.on('stranger_stopped_typing', () => {
     typingStatus.textContent = '';
 });
 
-
+// --- SENDING MESSAGES ---
 function sendMessage() {
     const message = messageInput.value.trim();
     if (message !== '' && socket) {
-        console.log('Sending:', message);
         
-        // --- ADD MY MESSAGE TO UI (REQUEST 1) ---
+        // Add to my own UI
         const item = document.createElement('li');
         item.textContent = `You: ${message}`;
-        item.classList.add('my-message'); // This class right-aligns it
+        item.classList.add('my-message');
         messagesList.appendChild(item);
-        
-        // Scroll to bottom
         messagesList.scrollTop = messagesList.scrollHeight;
 
-        // Send message to server
         socket.emit('message', { message: message });
         
-        // Stop a "typing" indicator if one was running
-        clearTimeout(typingTimer);
-        socket.emit('stop_typing');
-
         messageInput.value = '';
+        socket.emit('stop_typing');
     }
 }
 
-messageInput.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
+messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
         sendMessage();
     }
 });
-
-// --- TYPING INDICATOR EMITTERS ---
-messageInput.addEventListener('input', () => {
-    if (socket) {
-        socket.emit('typing');
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => {
-            if (socket) {
-                socket.emit('stop_typing');
-            }
-        }, 2000); // 2-second timeout
-    }
-});
-
 sendButton.addEventListener('click', sendMessage);
+
+// Typing indicators
+messageInput.addEventListener('input', () => {
+    socket.emit('typing');
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => socket.emit('stop_typing'), 2000);
+});

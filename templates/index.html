@@ -3,144 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHITZO | Secure Chat</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-        
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Custom message styles removed to allow flex/tailwind to handle position/color */
-        /* .message-in and .message-out are now handled by classes in JS's addMessage function */
-        
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .pulse-ring { animation: pulse-blue 2s infinite; }
-        @keyframes pulse-blue {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-    </style>
+    <title>Chat Room</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="h-screen w-full overflow-hidden flex flex-col">
+<body>
+    <div class="container">
+        <!-- Login Screen -->
+        <div id="login-screen" class="login-screen">
+            <div class="login-box">
+                <h1>Welcome to Chat Room</h1>
+                <input type="text" id="username-input" placeholder="Enter your username" maxlength="20">
+                <button id="join-btn">Join Chat</button>
+            </div>
+        </div>
 
-    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
-
-    <div id="login-screen" class="flex-1 flex items-center justify-center bg-slate-900">
-        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa')] bg-cover bg-center opacity-20"></div>
-        <div class="relative z-10 glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 fade-in">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-blue-600 rounded-full mx-auto flex items-center justify-center mb-4 shadow-lg">
-                    <i class="fas fa-network-wired text-2xl text-white"></i>
+        <!-- Chat Screen -->
+        <div id="chat-screen" class="chat-screen hidden">
+            <div class="chat-header">
+                <h2>Chat Room - General</h2>
+                <div class="user-info">
+                    <span id="user-count">0 users online</span>
+                    <span id="current-user"></span>
                 </div>
-                <h1 class="text-3xl font-bold text-white">Nexus Connect</h1>
-                <p class="text-slate-400 mt-2">Secure P2P & Group Gateway</p>
             </div>
 
-            <form id="login-form" class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">Display Name</label>
-                    <input type="text" id="username" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-blue-500" placeholder="Letters only (e.g. Alex)" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">Age</label>
-                    <input type="number" id="age" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-blue-500" placeholder="13+" required>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-lg transition-all">Enter Gateway</button>
-            </form>
-            <div class="mt-6 text-center">
-                <span class="text-xs text-emerald-400">
-                    <i class="fas fa-circle text-[8px] animate-pulse mr-1"></i> Online Users: <span id="server-cap-display">...</span>
-                </span>
+            <div class="chat-container">
+                <div id="messages" class="messages"></div>
+                <div id="typing-indicator" class="typing-indicator"></div>
+            </div>
+
+            <div class="chat-input">
+                <input type="text" id="message-input" placeholder="Type a message..." maxlength="500">
+                <button id="send-btn">Send</button>
             </div>
         </div>
     </div>
 
-    <div id="app-interface" class="hidden h-full flex flex-col md:flex-row bg-slate-900">
-        <div class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col z-20">
-            <div class="p-5 border-b border-slate-800 flex justify-between items-center">
-                <h2 class="font-bold text-lg text-white"><i class="fas fa-circle-nodes text-blue-500"></i> Nexus</h2>
-                <div id="user-badge" class="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300 border border-slate-700"></div>
-            </div>
-            <div class="p-4 space-y-4 flex-1 overflow-y-auto">
-                <button id="btn-p2p" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-700 transition-all flex items-center gap-3">
-                    <i class="fas fa-user-secret"></i> Random P2P
-                </button>
-                <button id="btn-group" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-700 transition-all flex items-center gap-3">
-                    <i class="fas fa-users"></i> Group Channels
-                </button>
-                <div id="region-selector" class="hidden space-y-2 pt-4 border-t border-slate-800">
-                    <label class="text-xs font-semibold text-slate-500 uppercase">Region</label>
-                    <select id="region-select" class="w-full bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2.5">
-                        <option value="global">Global</option>
-                        <option value="na">North America</option>
-                        <option value="eu">Europe</option>
-                        <option value="asia">Asia</option>
-                    </select>
-                </div>
-                <div id="active-call-panel" class="hidden p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 mt-4">
-                    <div class="text-xs text-rose-400 font-bold uppercase animate-pulse mb-2">Live Call</div>
-                    <button id="btn-end-call" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg text-sm">End Call</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="flex-1 flex flex-col relative bg-[#0b1120]">
-            <div class="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur">
-                <div class="flex items-center gap-3">
-                    <div id="chat-status-indicator" class="w-3 h-3 bg-slate-500 rounded-full"></div>
-                    <div>
-                        <h3 id="chat-title" class="font-semibold text-white">Idle</h3>
-                        <p id="chat-subtitle" class="text-xs text-slate-400">Select a mode to start</p>
-                    </div>
-                </div>
-                <div class="flex gap-3">
-                    <button id="btn-vc" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"><i class="fas fa-phone"></i></button>
-                    <button id="btn-video" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"><i class="fas fa-video"></i></button>
-                </div>
-            </div>
-
-            <div id="messages-container" class="flex-1 overflow-y-auto p-6 flex flex-col relative">
-                <div id="welcome-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
-                    <i class="fas fa-comments text-6xl mb-4 opacity-20"></i>
-                    <p>Start a conversation</p>
-                </div>
-            </div>
-
-            <div id="video-overlay" class="hidden absolute top-4 right-4 w-64 bg-black rounded-xl border border-slate-700 overflow-hidden z-30 shadow-2xl">
-                <div class="relative aspect-video bg-slate-800">
-                    <video id="remote-video" class="w-full h-full object-cover" autoplay playsinline></video>
-                    <div class="absolute bottom-2 right-2 w-20 aspect-video bg-black rounded-lg border border-white/20 overflow-hidden">
-                        <video id="local-video" class="w-full h-full object-cover transform scale-x-[-1]" autoplay playsinline muted></video>
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-4 bg-slate-900 border-t border-slate-800">
-                <div class="flex items-end gap-2 max-w-4xl mx-auto">
-                    <button id="btn-record" class="p-3 rounded-full bg-slate-800 text-slate-400 hover:text-rose-500 transition-all"><i class="fas fa-microphone"></i></button>
-                    <div class="flex-1 bg-slate-800 rounded-2xl p-1 flex items-center border border-slate-700">
-                        <input type="text" id="message-input" class="w-full bg-transparent border-none text-white px-4 py-2 focus:ring-0" placeholder="Type a message..." disabled>
-                    </div>
-                    <button id="btn-send" class="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-50"><i class="fas fa-paper-plane"></i></button>
-                </div>
-                <div id="recording-status" class="text-xs text-rose-400 font-bold mt-2 ml-14 hidden">Recording...</div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="/static/chat.js"></script> 
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='chat.js') }}"></script>
 </body>
 </html>

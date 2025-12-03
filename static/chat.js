@@ -1,137 +1,149 @@
-const socket = io();
+// --- LOBBY ELEMENTS ---
+const lobby = document.getElementById('lobby');
+const startChatButton = document.getElementById('start-chat-button');
+const nameInput = document.getElementById('name-input');
+const ageInput = document.getElementById('age-input');
+const userCountDisplay = document.getElementById('user-count'); // NEW: For online count
 
-let username = '';
+// --- CHAT ELEMENTS ---
+const chatContainer = document.getElementById('chat-container');
+const messageInput = document.getElementById('message-input');
+const sendButton = document.getElementById('send-button');
+const messagesList = document.getElementById('messages');
+const statusBox = document.getElementById('status');
+const typingStatus = document.getElementById('typing-status');
+
+let socket = io(); // NEW: Connect on page load to get user count
+let currentName; // NEW: Store name globally for reconnect
 let typingTimer;
 
-// DOM Elements
-const loginScreen = document.getElementById('login-screen');
-const chatScreen = document.getElementById('chat-screen');
-const usernameInput = document.getElementById('username-input');
-const joinBtn = document.getElementById('join-btn');
-const messageInput = document.getElementById('message-input');
-const sendBtn = document.getElementById('send-btn');
-const messagesDiv = document.getElementById('messages');
-const typingIndicator = document.getElementById('typing-indicator');
-const currentUserSpan = document.getElementById('current-user');
-const userCountSpan = document.getElementById('user-count');
-
-// Join chat room
-joinBtn.addEventListener('click', joinChat);
-usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') joinChat();
-});
-
-function joinChat() {
-    username = usernameInput.value.trim();
+// --- LOBBY LOGIC ---
+startChatButton.addEventListener('click', () => {
+    currentName = nameInput.value.trim(); // Use global variable
+    const age = parseInt(ageInput.value, 10);
     
-    if (username === '') {
-        alert('Please enter a username');
+    // REQ 2: Validate name (letters and spaces only)
+    const nameRegex = /^[A-Za-z\s]+$/;
+    if (currentName === '' || !nameRegex.test(currentName)) {
+        alert('Please enter your name (letters and spaces only).');
         return;
     }
-    
-    socket.emit('join', { username, room: 'general' });
-    
-    loginScreen.classList.add('hidden');
-    chatScreen.classList.remove('hidden');
-    currentUserSpan.textContent = username;
-    messageInput.focus();
-}
 
-// Send message
-sendBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
+    // REQ 3 & 4: Validate age (13+, numbers only)
+    if (isNaN(age) || age < 13) {
+        alert('You must be 13 or older to chat.');
+        return;
+    }
+
+    // --- REQ 1: Pop-up message removed ---
+
+    // Hide lobby and show chat
+    lobby.style.display = 'none';
+    chatContainer.style.display = 'flex';
+
+    // NOW join the queue
+    statusBox.textContent = 'Waiting for a match...';
+    messagesList.innerHTML = ''; // Clear old messages
+    socket.emit('join_queue', { name: currentName });
 });
 
-function sendMessage() {
-    const message = messageInput.value.trim();
-    
-    if (message === '') return;
-    
-    socket.emit('send_message', { message });
-    messageInput.value = '';
-    messageInput.focus();
-}
 
-// Typing indicator
-messageInput.addEventListener('input', () => {
-    socket.emit('typing', {});
-    
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => {
-        typingIndicator.textContent = '';
-    }, 1000);
+// --- GLOBAL SOCKET LOGIC (runs on page load) ---
+
+socket.on('connect', () => {
+    console.log('Connected with ID:', socket.id);
+    // Client will automatically get a user count broadcast
 });
 
-// Socket event listeners
-socket.on('load_messages', (data) => {
-    data.messages.forEach(msg => {
-        addMessage(msg);
-    });
+// REQ 7: Listen for user count updates
+socket.on('update_user_count', (data) => {
+    userCountDisplay.textContent = data.count;
+});
+
+socket.on('match_found', (data) => {
+    statusBox.textContent = data.message;
+    messagesList.innerHTML = '';
+    typingStatus.textContent = '';
 });
 
 socket.on('new_message', (data) => {
-    addMessage(data);
+    // This is a message from the STRANGER
+    const item = document.createElement('li');
+    item.textContent = `${data.name}: ${data.message}`;
+    messagesList.appendChild(item);
+    // Scroll to bottom
+    messagesList.scrollTop = messagesList.scrollHeight;
 });
 
-socket.on('user_joined', (data) => {
-    addSystemMessage(`${data.username} joined the chat`);
+// REQ 8: Auto-reconnect on disconnect
+socket.on('user_disconnected', (data) => {
+    const item = document.createElement('li');
+    item.textContent = data.message;
+    item.style.color = 'red';
+    item.style.fontStyle = 'italic';
+    messagesList.appendChild(item);
+    
+    // NEW: Auto-reconnect logic
+    statusBox.textContent = 'Stranger disconnected. Finding a new match...';
+    typingStatus.textContent = '';
+    
+    // Re-join the queue using the stored name
+    socket.emit('join_queue', { name: currentName });
 });
 
-socket.on('user_left', (data) => {
-    addSystemMessage(`${data.username} left the chat`);
+// --- TYPING INDICATOR LISTENERS ---
+socket.on('stranger_typing', () => {
+    typingStatus.textContent = 'Stranger is typing...';
 });
 
-socket.on('user_count', (data) => {
-    userCountSpan.textContent = `${data.count} user${data.count !== 1 ? 's' : ''} online`;
+socket.on('stranger_stopped_typing', () => {
+    typingStatus.textContent = '';
 });
 
-socket.on('user_typing', (data) => {
-    typingIndicator.textContent = `${data.username} is typing...`;
-    
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => {
-        typingIndicator.textContent = '';
-    }, 2000);
-});
 
-// Helper functions
-function addMessage(data) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${data.username === username ? 'own' : 'other'}`;
-    
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'message-header';
-    
-    const usernameSpan = document.createElement('span');
-    usernameSpan.textContent = data.username;
-    
-    const timestampSpan = document.createElement('span');
-    timestampSpan.textContent = data.timestamp;
-    
-    headerDiv.appendChild(usernameSpan);
-    headerDiv.appendChild(timestampSpan);
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.textContent = data.message;
-    
-    messageDiv.appendChild(headerDiv);
-    messageDiv.appendChild(contentDiv);
-    
-    messagesDiv.appendChild(messageDiv);
-    scrollToBottom();
+function sendMessage() {
+    const message = messageInput.value.trim();
+    if (message !== '' && socket) {
+        console.log('Sending:', message);
+        
+        // --- ADD MY MESSAGE TO UI (REQUEST 1) ---
+        const item = document.createElement('li');
+        item.textContent = `You: ${message}`;
+        item.classList.add('my-message'); // This class right-aligns it
+        messagesList.appendChild(item);
+        
+        // Scroll to bottom
+        messagesList.scrollTop = messagesList.scrollHeight;
+
+        // Send message to server
+        socket.emit('message', { message: message });
+        
+        // Stop a "typing" indicator if one was running
+        clearTimeout(typingTimer);
+        socket.emit('stop_typing');
+
+        messageInput.value = '';
+    }
 }
 
-function addSystemMessage(message) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'system-message';
-    messageDiv.textContent = message;
-    messagesDiv.appendChild(messageDiv);
-    scrollToBottom();
-}
+messageInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
+    }
+});
 
-function scrollToBottom() {
-    const chatContainer = document.querySelector('.chat-container');
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-}
+// --- TYPING INDICATOR EMITTERS ---
+messageInput.addEventListener('input', () => {
+    if (socket) {
+        socket.emit('typing');
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+            if (socket) {
+                socket.emit('stop_typing');
+            }
+        }, 2000); // 2-second timeout
+    }
+});
+
+sendButton.addEventListener('click', sendMessage);

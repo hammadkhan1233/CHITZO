@@ -3,43 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Room</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>ChatHub</title>
+    <style>
+        /* --- Basic Reset & Body --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* --- Lobby Screen --- */
+        #lobby {
+            width: 100%;
+            max-width: 450px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+        }
+
+        #lobby h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        /* --- MODIFIED: 13+ Text --- */
+        #lobby p {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+        }
+
+        /* --- NEW: Online Counter Style --- */
+        #online-counter {
+            color: #555;
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #online-counter span {
+            color: #007bff;
+            font-weight: bold;
+        }
+
+
+        #lobby .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        #lobby label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #444;
+        }
+
+        #lobby input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        #lobby button {
+            width: 100%;
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+            margin-top: 10px;
+        }
+
+        #lobby button:hover {
+            background-color: #0056b3;
+        }
+
+        /* --- Chat Container --- */
+        .chat-container {
+            width: 100%;
+            max-width: 650px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Keeps rounded corners */
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            height: 90vh; /* Make the container tall */
+            max-height: 700px;
+        }
+
+        /* --- Header --- */
+        .chat-container h1 {
+            background-color: #007bff;
+            color: white;
+            padding: 16px 20px;
+            font-size: 1.25rem;
+            text-align: center;
+            margin: 0;
+        }
+
+        /* --- Status Bar --- */
+        #status {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #555;
+            background-color: #fcfcfc;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+
+        /* --- Message List (The Chat Box) --- */
+        #chat-box {
+            flex-grow: 1; /* Makes the chat box fill available space */
+            overflow-y: scroll;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+
+        ul#messages {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Message Bubbles --- */
+        ul#messages li {
+            padding: 10px 15px;
+            border-radius: 18px;
+            background-color: #e9e9eb; /* Neutral gray for STRANGER */
+            color: #333;
+            max-width: 80%;
+            word-wrap: break-word;
+            align-self: flex-start; /* Stranger messages on left */
+            text-align: left;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        
+        /* --- ADDED FOR YOUR MESSAGES --- */
+        ul#messages li.my-message {
+            background-color: #007bff; /* Blue for USER */
+            color: white;
+            align-self: flex-end; /* User messages on right */
+        }
+
+
+        /* --- Typing Status --- */
+        #typing-status {
+            font-style: italic;
+            color: #777;
+            padding: 0px 20px 10px;
+            height: 1.2em; /* Reserve space to prevent layout jump */
+        }
+
+
+        /* --- Input Area --- */
+        .input-area {
+            display: flex;
+            padding: 15px;
+            background-color: #ffffff;
+            border-top: 1px solid #ddd;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #ccc;
+            border-radius: 24px; /* Pill shape */
+            margin-right: 10px;
+            font-size: 1rem;
+        }
+        
+        #message-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        #send-button {
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 24px; /* Pill shape */
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+        }
+
+        #send-button:hover {
+            background-color: #0056b3;
+        }
+
+    </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Login Screen -->
-        <div id="login-screen" class="login-screen">
-            <div class="login-box">
-                <h1>Welcome to Chat Room</h1>
-                <input type="text" id="username-input" placeholder="Enter your username" maxlength="20">
-                <button id="join-btn">Join Chat</button>
-            </div>
+
+    <div id="lobby">
+        <h1>Welcome to ChatHub</h1>
+        
+        <p id="online-counter"><span id="user-count">0</span> people online</p>
+
+        <p>Please enter your information to start chatting. You must be 13 or older. By chatting, you confirm you have parental permission.</p>
+        
+        <div class="form-group">
+            <label for="name-input">Your Name:</label>
+            <input type="text" id="name-input" placeholder="Enter your name (letters only)">
+        </div>
+        
+        <div class="form-group">
+            <label for="age-input">Your Age (13+):</label>
+            <input type="number" id="age-input" placeholder="Enter your age (numbers only)">
         </div>
 
-        <!-- Chat Screen -->
-        <div id="chat-screen" class="chat-screen hidden">
-            <div class="chat-header">
-                <h2>Chat Room - General</h2>
-                <div class="user-info">
-                    <span id="user-count">0 users online</span>
-                    <span id="current-user"></span>
-                </div>
-            </div>
+        <button id="start-chat-button">Start Chat</button>
+    </div>
 
-            <div class="chat-container">
-                <div id="messages" class="messages"></div>
-                <div id="typing-indicator" class="typing-indicator"></div>
-            </div>
 
-            <div class="chat-input">
-                <input type="text" id="message-input" placeholder="Type a message..." maxlength="500">
-                <button id="send-btn">Send</button>
-            </div>
+    <div class="chat-container" id="chat-container">
+        
+        <h1>ChatHub</h1>
+        
+        <div id="status">Waiting for a match...</div>
+
+        <div id="chat-box">
+            <ul id="messages"></ul>
         </div>
+        
+        <div id="typing-status"></div>
+
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <button id="send-button">Send</button>
+        </div>
+
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='chat.js') }}"></script>
+    <script src="/static/chat.js"></script>
 </body>
 </html>

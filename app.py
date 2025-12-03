@@ -1,10 +1,13 @@
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, send, emit
+from flask import Flask, render_template
+from flask_socketio import SocketIO, send
 import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'secret')
-# cors_allowed_origins="*" is important for Render
+# In production, it is best practice to use environment variables for secret keys
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chitzo_default_secret')
+app.config['DEBUG'] = False
+
+# cors_allowed_origins="*" allows connections from your Render domain
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route('/')
@@ -13,13 +16,9 @@ def index():
 
 @socketio.on('message')
 def handleMessage(msg):
-    # Broadcast the message to everyone
+    print('Message: ' + msg)
     send(msg, broadcast=True)
 
-@socketio.on('typing')
-def handle_typing(username):
-    # Broadcast that someone is typing, but NOT to the person typing
-    emit('typing', username, broadcast=True, include_self=False)
-
 if __name__ == '__main__':
-    socketio.run(app)
+    # This block is for running locally
+    socketio.run(app, host='0.0.0.0', port=5000)
